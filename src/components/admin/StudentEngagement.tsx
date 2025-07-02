@@ -10,7 +10,7 @@ import { Search, Mail, MessageSquare, Award, AlertTriangle, CheckCircle } from '
 interface Student {
   id: string;
   name: string;
-  email: string;
+  email: string;  
   initials: string;
   lastActive: string;
   engagementScore: number;
@@ -26,7 +26,7 @@ export const StudentEngagement = () => {
   const [students] = useState<Student[]>([
     {
       id: '1',
-      name: 'Alex Rivera',
+      name: 'Alex Rivera', 
       email: 'alex@example.com',
       initials: 'AR',
       lastActive: '2 hours ago',
@@ -76,7 +76,7 @@ export const StudentEngagement = () => {
       status: 'inactive',
       weeklyProgress: 15
     }
-  ];
+  ]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

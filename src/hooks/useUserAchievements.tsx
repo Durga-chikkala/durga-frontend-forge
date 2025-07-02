@@ -16,6 +16,7 @@ interface Achievement {
   unlocked: boolean;
   progress: number;
   maxProgress: number;
+  rarity: string;
 }
 
 export const useUserAchievements = () => {

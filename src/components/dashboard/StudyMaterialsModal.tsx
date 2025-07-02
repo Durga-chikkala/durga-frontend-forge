@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { BookOpen, Download, ExternalLink, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { BookOpen, Download, ExternalLink, FileText } from 'lucide-react';
 
 interface StudyMaterial {
   id: string;
@@ -35,7 +34,6 @@ export const StudyMaterialsModal = ({ isOpen, onClose }: StudyMaterialsModalProp
 
   const fetchMaterials = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('study_materials')
         .select('*')
@@ -56,22 +54,21 @@ export const StudyMaterialsModal = ({ isOpen, onClose }: StudyMaterialsModalProp
     }
   };
 
-  const getFileIcon = (fileType: string | null) => {
-    switch (fileType) {
-      case 'pdf':
-        return <FileText className="w-5 h-5 text-red-500" />;
-      case 'video':
-        return <BookOpen className="w-5 h-5 text-blue-500" />;
-      case 'link':
-        return <ExternalLink className="w-5 h-5 text-green-500" />;
-      default:
-        return <Download className="w-5 h-5 text-gray-500" />;
+  const handleDownload = (material: StudyMaterial) => {
+    if (material.file_url) {
+      window.open(material.file_url, '_blank');
+    } else {
+      toast({
+        title: 'No File Available',
+        description: 'This material does not have a downloadable file',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
@@ -79,53 +76,65 @@ export const StudyMaterialsModal = ({ isOpen, onClose }: StudyMaterialsModalProp
           </DialogTitle>
         </DialogHeader>
         
-        <div className="overflow-y-auto max-h-[60vh] space-y-4">
+        <div className="space-y-4">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p>Loading study materials...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-2">Loading materials...</p>
             </div>
           ) : materials.length === 0 ? (
             <div className="text-center py-8">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">No Materials Available</h3>
-              <p className="text-gray-500">Study materials will be published here as the course progresses.</p>
+              <p className="text-gray-500">Study materials will be published here as they become available.</p>
             </div>
           ) : (
             <div className="grid gap-4">
               {materials.map((material) => (
                 <Card key={material.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {getFileIcon(material.file_type)}
-                        {material.title}
-                      </CardTitle>
-                      <div className="flex gap-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{material.title}</CardTitle>
                         {material.week_number && (
-                          <Badge variant="outline">Week {material.week_number}</Badge>
+                          <p className="text-sm text-gray-600 mt-1">Week {material.week_number}</p>
                         )}
-                        <Badge variant="secondary">{material.file_type?.toUpperCase()}</Badge>
                       </div>
+                      {material.file_type && (
+                        <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          <FileText className="w-3 h-3" />
+                          {material.file_type.toUpperCase()}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     {material.description && (
-                      <p className="text-gray-600 mb-4">{material.description}</p>
+                      <p className="text-gray-700 mb-4">{material.description}</p>
                     )}
-                    {material.file_url && (
-                      <Button asChild className="w-full">
-                        <a
-                          href={material.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    <div className="flex gap-2">
+                      {material.file_url && (
+                        <Button
+                          onClick={() => handleDownload(material)}
                           className="flex items-center gap-2"
+                          size="sm"
                         >
                           <Download className="w-4 h-4" />
-                          Access Material
-                        </a>
-                      </Button>
-                    )}
+                          Download
+                        </Button>
+                      )}
+                      {material.file_url && (
+                        <Button
+                          onClick={() => window.open(material.file_url!, '_blank')}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View Online
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}

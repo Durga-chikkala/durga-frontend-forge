@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -186,12 +185,70 @@ const Dashboard = () => {
     });
   };
 
-  const handleVideoComplete = (sessionId: string) => {
-    markSessionComplete(sessionId);
-    toast({
-      title: 'Progress Updated',
-      description: 'Session marked as completed!',
-    });
+  const handleVideoComplete = async (sessionId: string) => {
+    if (!user) return;
+
+    try {
+      // Create a study session record
+      const { error: sessionError } = await supabase
+        .from('user_study_sessions')
+        .insert({
+          user_id: user.id,
+          content_id: sessionId,
+          completed: true,
+          session_duration: 60 // Default 60 minutes
+        });
+
+      if (sessionError) throw sessionError;
+
+      // Update user progress
+      const { data: existingProgress } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('week_number', 1) // Assuming week 1 for now
+        .single();
+
+      if (existingProgress) {
+        // Update existing progress
+        const { error: updateError } = await supabase
+          .from('user_progress')
+          .update({
+            total_points: (existingProgress.total_points || 0) + 50,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingProgress.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new progress record
+        const { error: insertError } = await supabase
+          .from('user_progress')
+          .insert({
+            user_id: user.id,
+            week_number: 1,
+            total_points: 50,
+            study_streak: 1
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // Mark session as complete in course progress
+      markSessionComplete(sessionId);
+      
+      toast({
+        title: 'Progress Updated',
+        description: 'Session marked as completed! +50 points earned.',
+      });
+    } catch (error) {
+      console.error('Error completing session:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to mark session as complete',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Show loading while auth is loading or data is loading

@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Calendar, Clock, Users, ExternalLink, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Clock, Users, ExternalLink, UserPlus } from 'lucide-react';
 
 interface ScheduledSession {
   id: string;
@@ -16,7 +16,7 @@ interface ScheduledSession {
   session_date: string;
   meeting_link: string | null;
   max_participants: number | null;
-  current_participants: number;
+  current_participants: number | null;
   is_registered?: boolean;
 }
 
@@ -39,9 +39,6 @@ export const ScheduleModal = ({ isOpen, onClose }: ScheduleModalProps) => {
 
   const fetchSessions = async () => {
     try {
-      setLoading(true);
-      
-      // Fetch sessions with registration status
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('scheduled_sessions')
         .select('*')
@@ -51,15 +48,13 @@ export const ScheduleModal = ({ isOpen, onClose }: ScheduleModalProps) => {
 
       if (sessionsError) throw sessionsError;
 
-      // Check which sessions the user is registered for
-      const { data: registrationsData, error: registrationsError } = await supabase
+      // Check user registrations
+      const { data: registrations } = await supabase
         .from('session_registrations')
         .select('session_id')
-        .eq('user_id', user?.id);
+        .eq('user_id', user!.id);
 
-      if (registrationsError) throw registrationsError;
-
-      const registeredSessionIds = new Set(registrationsData?.map(r => r.session_id) || []);
+      const registeredSessionIds = new Set(registrations?.map(r => r.session_id) || []);
 
       const sessionsWithRegistration = sessionsData?.map(session => ({
         ...session,
@@ -80,32 +75,15 @@ export const ScheduleModal = ({ isOpen, onClose }: ScheduleModalProps) => {
   };
 
   const handleRegister = async (sessionId: string) => {
-    if (!user) return;
-
     try {
       const { error } = await supabase
         .from('session_registrations')
         .insert({
           session_id: sessionId,
-          user_id: user.id
+          user_id: user!.id
         });
 
       if (error) throw error;
-
-      // Update participant count manually
-      const session = sessions.find(s => s.id === sessionId);
-      if (session) {
-        const { error: updateError } = await supabase
-          .from('scheduled_sessions')
-          .update({ 
-            current_participants: (session.current_participants || 0) + 1 
-          })
-          .eq('id', sessionId);
-
-        if (updateError) {
-          console.error('Error updating participant count:', updateError);
-        }
-      }
 
       toast({
         title: 'Success',
@@ -113,27 +91,35 @@ export const ScheduleModal = ({ isOpen, onClose }: ScheduleModalProps) => {
       });
 
       fetchSessions(); // Refresh the list
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error registering for session:', error);
-      if (error.code === '23505') {
-        toast({
-          title: 'Already Registered',
-          description: 'You are already registered for this session.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to register for session',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: 'Failed to register for session',
+        variant: 'destructive',
+      });
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="w-5 h-5" />
@@ -141,76 +127,79 @@ export const ScheduleModal = ({ isOpen, onClose }: ScheduleModalProps) => {
           </DialogTitle>
         </DialogHeader>
         
-        <div className="overflow-y-auto max-h-[60vh] space-y-4">
+        <div className="space-y-4">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p>Loading sessions...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-2">Loading sessions...</p>
             </div>
           ) : sessions.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">No Upcoming Sessions</h3>
-              <p className="text-gray-500">New sessions will be scheduled and appear here.</p>
+              <p className="text-gray-500">New sessions will be scheduled and posted here.</p>
             </div>
           ) : (
             <div className="grid gap-4">
               {sessions.map((session) => (
                 <Card key={session.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{session.title}</CardTitle>
-                      <div className="flex gap-2">
-                        {session.is_registered && (
-                          <Badge variant="default">Registered</Badge>
-                        )}
-                        <Badge variant="outline">
-                          <Users className="w-3 h-3 mr-1" />
-                          {session.current_participants}/{session.max_participants || '∞'}
-                        </Badge>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{session.title}</CardTitle>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {formatDate(session.session_date)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {formatTime(session.session_date)}
+                          </div>
+                          {session.max_participants && (
+                            <div className="flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              {session.current_participants || 0}/{session.max_participants}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      {session.is_registered && (
+                        <Badge className="bg-green-100 text-green-800">
+                          Registered
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent>
                     {session.description && (
-                      <p className="text-gray-600">{session.description}</p>
+                      <p className="text-gray-700 mb-4">{session.description}</p>
                     )}
-                    
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(session.session_date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {new Date(session.session_date).toLocaleTimeString()}
-                      </div>
-                    </div>
-
                     <div className="flex gap-2">
                       {!session.is_registered ? (
-                        <Button 
+                        <Button
                           onClick={() => handleRegister(session.id)}
                           className="flex items-center gap-2"
-                          disabled={session.max_participants ? session.current_participants >= session.max_participants : false}
+                          disabled={session.max_participants && (session.current_participants || 0) >= session.max_participants}
                         >
-                          <UserPlus className="w-4 h-4" />
+                          <Users className="w-4 h-4" />
                           Register
                         </Button>
                       ) : (
-                        session.meeting_link && (
-                          <Button asChild>
-                            <a
-                              href={session.meeting_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              Join Meeting
-                            </a>
-                          </Button>
-                        )
+                        <Button variant="outline" disabled>
+                          <Users className="w-4 h-4 mr-2" />
+                          Registered
+                        </Button>
+                      )}
+                      {session.meeting_link && session.is_registered && (
+                        <Button
+                          onClick={() => window.open(session.meeting_link!, '_blank')}
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Join Meeting
+                        </Button>
                       )}
                     </div>
                   </CardContent>

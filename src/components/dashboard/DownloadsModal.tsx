@@ -1,21 +1,21 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Download, Search, FileText, Archive, Image, Code, Calendar } from 'lucide-react';
+import { Download, FileText, Video, BookOpen, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface DownloadItem {
   id: string;
-  name: string;
-  type: 'pdf' | 'zip' | 'image' | 'code';
-  size: string;
-  uploadDate: string;
-  category: string;
-  description: string;
-  downloadUrl: string;
+  title: string;
+  description: string | null;
+  type: 'material' | 'video' | 'content';
+  url: string;
+  file_type?: string | null;
+  week_number?: number | null;
 }
 
 interface DownloadsModalProps {
@@ -24,91 +24,100 @@ interface DownloadsModalProps {
 }
 
 export const DownloadsModal = ({ isOpen, onClose }: DownloadsModalProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [downloads] = useState<DownloadItem[]>([
-    {
-      id: '1',
-      name: 'HTML5 Semantic Elements Cheat Sheet',
-      type: 'pdf',
-      size: '2.3 MB',
-      uploadDate: '2025-01-10',
-      category: 'HTML',
-      description: 'Complete reference for HTML5 semantic elements',
-      downloadUrl: '#'
-    },
-    {
-      id: '2',
-      name: 'CSS Grid Layout Examples',
-      type: 'zip',
-      size: '5.7 MB',
-      uploadDate: '2025-01-12',
-      category: 'CSS',
-      description: 'Collection of CSS Grid layout examples and exercises',
-      downloadUrl: '#'
-    },
-    {
-      id: '3',
-      name: 'JavaScript ES6 Code Samples',
-      type: 'zip',
-      size: '3.1 MB',
-      uploadDate: '2025-01-14',
-      category: 'JavaScript',
-      description: 'Modern JavaScript code examples and best practices',
-      downloadUrl: '#'
-    },
-    {
-      id: '4',
-      name: 'React Component Library',
-      type: 'zip',
-      size: '12.5 MB',
-      uploadDate: '2025-01-16',
-      category: 'React',
-      description: 'Reusable React components for your projects',
-      downloadUrl: '#'
-    },
-    {
-      id: '5',
-      name: 'Design System Assets',
-      type: 'zip',
-      size: '8.9 MB',
-      uploadDate: '2025-01-18',
-      category: 'Design',
-      description: 'Icons, fonts, and design system components',
-      downloadUrl: '#'
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchDownloads();
     }
-  ]);
+  }, [isOpen]);
+
+  const fetchDownloads = async () => {
+    try {
+      const downloadItems: DownloadItem[] = [];
+
+      // Fetch study materials
+      const { data: materials } = await supabase
+        .from('study_materials')
+        .select('*')
+        .eq('is_published', true)
+        .not('file_url', 'is', null);
+
+      materials?.forEach(material => {
+        downloadItems.push({
+          id: material.id,
+          title: material.title,
+          description: material.description,
+          type: 'material',
+          url: material.file_url!,
+          file_type: material.file_type,
+          week_number: material.week_number
+        });
+      });
+
+      // Fetch course content with video links
+      const { data: content } = await supabase
+        .from('course_content')
+        .select('*')
+        .eq('is_published', true)
+        .not('gdrive_video_links', 'is', null);
+
+      content?.forEach(item => {
+        const videoLinks = Array.isArray(item.gdrive_video_links) 
+          ? item.gdrive_video_links.filter((link): link is string => typeof link === 'string')
+          : [];
+        
+        videoLinks.forEach((link, index) => {
+          downloadItems.push({
+            id: `${item.id}-video-${index}`,
+            title: `${item.title} - Video ${index + 1}`,
+            description: item.description,
+            type: 'video',
+            url: link,
+            week_number: item.week_number
+          });
+        });
+      });
+
+      setDownloads(downloadItems.sort((a, b) => (a.week_number || 0) - (b.week_number || 0)));
+    } catch (error) {
+      console.error('Error fetching downloads:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load downloads',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = (item: DownloadItem) => {
+    window.open(item.url, '_blank');
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'pdf': return FileText;
-      case 'zip': return Archive;
-      case 'image': return Image;
-      case 'code': return Code;
-      default: return FileText;
+      case 'video':
+        return Video;
+      case 'material':
+        return FileText;
+      default:
+        return BookOpen;
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'pdf': return 'bg-red-100 text-red-800';
-      case 'zip': return 'bg-purple-100 text-purple-800';
-      case 'image': return 'bg-green-100 text-green-800';
-      case 'code': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'video':
+        return 'bg-red-100 text-red-800';
+      case 'material':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const filteredDownloads = downloads.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleDownload = (item: DownloadItem) => {
-    // In a real app, this would trigger the actual download
-    console.log('Downloading:', item.name);
-    // For demo purposes, we'll just show an alert
-    alert(`Downloading: ${item.name}`);
   };
 
   return (
@@ -117,74 +126,64 @@ export const DownloadsModal = ({ isOpen, onClose }: DownloadsModalProps) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Download className="w-5 h-5" />
-            Course Downloads
+            Downloads & Resources
           </DialogTitle>
         </DialogHeader>
         
-        <div className="mt-4">
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Search downloads..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <div className="grid gap-4">
-            {filteredDownloads.map((item) => {
-              const Icon = getIcon(item.type);
-              return (
-                <Card key={item.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <Icon className="w-6 h-6 text-gray-600" />
-                        <div>
-                          <CardTitle className="text-lg">{item.name}</CardTitle>
-                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{item.category}</Badge>
-                        <Badge className={getTypeColor(item.type)}>
-                          {item.type.toUpperCase()}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>{item.size}</span>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(item.uploadDate).toLocaleDateString()}
-                        </div>
-                      </div>
-                      
-                      <Button
-                        onClick={() => handleDownload(item)}
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        Download
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {filteredDownloads.length === 0 && (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-2">Loading downloads...</p>
+            </div>
+          ) : downloads.length === 0 ? (
             <div className="text-center py-8">
               <Download className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">No downloads found</h3>
-              <p className="text-gray-500">Try adjusting your search criteria.</p>
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Downloads Available</h3>
+              <p className="text-gray-500">Course materials and videos will be available for download here.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {downloads.map((item) => {
+                const Icon = getIcon(item.type);
+                return (
+                  <Card key={item.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-3">
+                          <Icon className="w-5 h-5 mt-1 text-gray-600" />
+                          <div>
+                            <CardTitle className="text-lg">{item.title}</CardTitle>
+                            {item.week_number && (
+                              <p className="text-sm text-gray-600 mt-1">Week {item.week_number}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge className={getTypeColor(item.type)}>
+                            {item.type === 'video' ? 'Video' : item.file_type || 'File'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {item.description && (
+                        <p className="text-gray-700 mb-4">{item.description}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleDownload(item)}
+                          className="flex items-center gap-2"
+                          size="sm"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          {item.type === 'video' ? 'Watch' : 'Download'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

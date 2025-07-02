@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ForumPost {
@@ -19,29 +19,29 @@ export const useDiscussionPosts = () => {
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('discussion_posts')
-          .select(`
-            *,
-            profiles!discussion_posts_user_id_fkey(full_name)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(10);
+  const fetchPosts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('discussion_posts')
+        .select(`
+          *,
+          profiles!discussion_posts_user_id_fkey(full_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-        if (error) throw error;
-        setPosts(data || []);
-      } catch (error) {
-        console.error('Error fetching discussion posts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPosts();
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error) {
+      console.error('Error fetching discussion posts:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { posts, loading };
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  return { posts, loading, refetch: fetchPosts };
 };

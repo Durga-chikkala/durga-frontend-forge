@@ -1,11 +1,49 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Flame, Calendar, Target } from 'lucide-react';
 import { useStudyStreak } from '@/hooks/useStudyStreak';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 export const StudyStreak = () => {
-  const { streakData, loading } = useStudyStreak();
+  const { streakData, loading, refetch } = useStudyStreak();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const markDayComplete = async () => {
+    if (!user) return;
+
+    try {
+      // Create a study session for today
+      const { error } = await supabase
+        .from('user_study_sessions')
+        .insert({
+          user_id: user.id,
+          completed: true,
+          session_duration: 30 // Default 30 minutes
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Study session recorded! Keep up the streak!',
+      });
+
+      // Refresh the streak data
+      refetch();
+    } catch (error) {
+      console.error('Error marking day complete:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to record study session',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -27,6 +65,9 @@ export const StudyStreak = () => {
       </Card>
     );
   }
+
+  const todayIndex = streakData.weekData.length - 1;
+  const hasStudiedToday = streakData.weekData[todayIndex]?.studied || false;
 
   return (
     <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-0 shadow-lg">
@@ -70,6 +111,19 @@ export const StudyStreak = () => {
               ))}
             </div>
           </div>
+
+          {/* Mark Today Complete Button */}
+          {!hasStudiedToday && (
+            <div className="text-center">
+              <Button
+                onClick={markDayComplete}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+                size="sm"
+              >
+                Mark Today Complete
+              </Button>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-orange-200">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +12,10 @@ import { StudyMaterialsAdmin } from '@/components/admin/StudyMaterialsAdmin';
 import { QuestionsAdmin } from '@/components/admin/QuestionsAdmin';
 import { SessionsAdmin } from '@/components/admin/SessionsAdmin';
 import { UsersAdmin } from '@/components/admin/UsersAdmin';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { QuickStats } from '@/components/admin/QuickStats';
+import { EngagementAnalytics } from '@/components/admin/EngagementAnalytics';
+import { StudentEngagement } from '@/components/admin/StudentEngagement';
 
 const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -160,108 +163,84 @@ const Admin = () => {
               <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Admin Panel
               </h1>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">Manage your course content and users</p>
+              <p className="text-gray-600 mt-1 text-sm lg:text-base">Manage your course content and student engagement</p>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Stats Cards - Ultra Responsive Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Materials</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.materials}</p>
-                </div>
-                <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-500 flex-shrink-0" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Enhanced Stats Cards */}
+        <QuickStats stats={stats} />
 
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Questions</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.questions}</p>
-                </div>
-                <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-500 flex-shrink-0" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Sessions</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.sessions}</p>
-                </div>
-                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-500 flex-shrink-0" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Users</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.users}</p>
-                </div>
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-orange-500 flex-shrink-0" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Enhanced Admin Tabs - Mobile First */}
-        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+        {/* Enhanced Admin Tabs */}
+        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-6">
           <CardContent className="p-2 sm:p-3 lg:p-6">
-            <Tabs defaultValue="materials" className="w-full">
+            <Tabs defaultValue="analytics" className="w-full">
               {/* Ultra Responsive Mobile Tab Navigation */}
               <div className="lg:hidden mb-3 sm:mb-4">
-                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100">
+                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100 mb-2">
                   <TabsTrigger 
-                    value="materials" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-blue-500 data-[state=active]:text-white rounded-md transition-all"
+                    value="analytics" 
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-indigo-500 data-[state=active]:text-white rounded-md"
                   >
                     <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="leading-tight">Materials</span>
+                    <span>Analytics</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="engagement" 
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-md"
+                  >
+                    <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span>Students</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100 mb-2">
+                  <TabsTrigger 
+                    value="materials" 
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-blue-500 data-[state=active]:text-white rounded-md"
+                  >
+                    <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span>Materials</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="questions" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-md transition-all"
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-md"
                   >
                     <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="leading-tight">Questions</span>
+                    <span>Q&A</span>
                   </TabsTrigger>
                 </TabsList>
-                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 mt-2 bg-gray-100">
+                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100">
                   <TabsTrigger 
                     value="sessions" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-purple-500 data-[state=active]:text-white rounded-md transition-all"
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-purple-500 data-[state=active]:text-white rounded-md"
                   >
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="leading-tight">Sessions</span>
+                    <span>Sessions</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="users" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-md transition-all"
+                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-md"
                   >
                     <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="leading-tight">Users</span>
+                    <span>Users</span>
                   </TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Desktop Tab Navigation */}
               <div className="hidden lg:block">
-                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1">
+                <TabsList className="grid w-full grid-cols-6 bg-gray-100 p-1">
+                  <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-white">
+                    <BookOpen className="w-4 h-4" />
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger value="engagement" className="flex items-center gap-2 data-[state=active]:bg-white">
+                    <Users className="w-4 h-4" />
+                    Student Engagement
+                  </TabsTrigger>
                   <TabsTrigger value="materials" className="flex items-center gap-2 data-[state=active]:bg-white">
                     <BookOpen className="w-4 h-4" />
-                    Study Materials
+                    Materials
                   </TabsTrigger>
                   <TabsTrigger value="questions" className="flex items-center gap-2 data-[state=active]:bg-white">
                     <MessageCircle className="w-4 h-4" />
@@ -277,6 +256,17 @@ const Admin = () => {
                   </TabsTrigger>
                 </TabsList>
               </div>
+
+              <TabsContent value="analytics" className="mt-4 sm:mt-6">
+                <div className="space-y-6">
+                  <AnalyticsDashboard />
+                  <EngagementAnalytics />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="engagement" className="mt-4 sm:mt-6">
+                <StudentEngagement />
+              </TabsContent>
 
               <TabsContent value="materials" className="mt-4 sm:mt-6">
                 <StudyMaterialsAdmin onStatsUpdate={fetchStats} />

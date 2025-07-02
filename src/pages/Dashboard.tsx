@@ -12,6 +12,13 @@ import { SearchAndFilter } from '@/components/dashboard/SearchAndFilter';
 import { ProgressTracker } from '@/components/dashboard/ProgressTracker';
 import { UserProfileCard } from '@/components/dashboard/UserProfileCard';
 import { QuickActions } from '@/components/dashboard/QuickActions';
+import { StatsCard } from '@/components/dashboard/StatsCard';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { LearningPath } from '@/components/dashboard/LearningPath';
+import { AchievementsPanel } from '@/components/dashboard/AchievementsPanel';
+import { StudyStreak } from '@/components/dashboard/StudyStreak';
+import { DiscussionForum } from '@/components/dashboard/DiscussionForum';
+import { Leaderboard } from '@/components/dashboard/Leaderboard';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
 
 interface CourseContent {
@@ -298,22 +305,51 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Ultra Mobile-First Components */}
-        <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-          {/* User Profile Card - Ultra Mobile Optimized */}
+        {/* Enhanced Dashboard Layout */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* User Profile Card */}
           <UserProfileCard profile={profile} />
 
-          {/* Progress Tracker - Ultra Mobile Optimized */}
-          <ProgressTracker 
-            totalWeeks={progress.totalWeeks}
-            completedWeeks={progress.completedWeeks}
-            currentWeek={progress.currentWeek}
-          />
+          {/* Progress and Streak Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="lg:col-span-2">
+              <ProgressTracker 
+                totalWeeks={progress.totalWeeks}
+                completedWeeks={progress.completedWeeks}
+                currentWeek={progress.currentWeek}
+              />
+            </div>
+            <div>
+              <StudyStreak />
+            </div>
+          </div>
 
-          {/* Quick Actions - Ultra Mobile Optimized */}
+          {/* Stats and Learning Path */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <StatsCard />
+            <LearningPath />
+          </div>
+
+          {/* Engagement Features */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <AchievementsPanel />
+            <Leaderboard />
+          </div>
+
+          {/* Quick Actions */}
           <QuickActions />
 
-          {/* Search and Filter - Ultra Mobile Optimized */}
+          {/* Community Features */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="lg:col-span-2">
+              <DiscussionForum />
+            </div>
+            <div>
+              <ActivityFeed />
+            </div>
+          </div>
+
+          {/* Search and Filter */}
           <SearchAndFilter
             onSearch={setSearchQuery}
             onFilter={setActiveFilter}
@@ -322,16 +358,21 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Ultra Enhanced Course Content - Mobile First */}
-        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 lg:space-y-6">
+        {/* Course Content Section */}
+        <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Course Content</h2>
+          </div>
+          
           {filteredContent.length === 0 ? (
             <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-4 sm:p-6 lg:p-8 text-center">
-                <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-600 mb-2">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2">
                   {searchQuery || activeFilter !== 'all' ? 'No matching content found' : 'No Content Available'}
                 </h3>
-                <p className="text-sm lg:text-base text-gray-500 max-w-md mx-auto leading-relaxed">
+                <p className="text-sm sm:text-base text-gray-500 max-w-md mx-auto">
                   {searchQuery || activeFilter !== 'all' 
                     ? 'Try adjusting your search or filter criteria.'
                     : 'Course content will be published here as the bootcamp progresses.'
@@ -340,64 +381,64 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-2">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
               {filteredContent.map((content) => (
-                <Card key={content.id} className="shadow-lg border-0 bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-[1.01] lg:hover:scale-[1.02] overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 sm:p-4 lg:p-6">
-                    <div className="flex justify-between items-start gap-2 sm:gap-3">
+                <Card key={content.id} className="shadow-lg border-0 bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-[1.01] overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 sm:p-6">
+                    <div className="flex justify-between items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-sm sm:text-base lg:text-xl mb-1 sm:mb-2 break-words leading-tight">
+                        <CardTitle className="text-base sm:text-xl mb-2 break-words">
                           {content.title}
                         </CardTitle>
                         {content.description && (
-                          <p className="text-blue-100 text-xs sm:text-sm lg:text-base break-words leading-relaxed">
+                          <p className="text-blue-100 text-sm sm:text-base break-words">
                             {content.description}
                           </p>
                         )}
                       </div>
-                      <div className="flex flex-col gap-1 sm:gap-2 flex-shrink-0">
+                      <div className="flex flex-col gap-2 flex-shrink-0">
                         {content.week_number && (
-                          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs whitespace-nowrap px-1.5 py-0.5">
+                          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
                             Week {content.week_number}
                           </Badge>
                         )}
                         {progress.completedSessions.includes(content.id) && (
-                          <Badge className="bg-green-600 text-white text-xs whitespace-nowrap px-1.5 py-0.5">
+                          <Badge className="bg-green-600 text-white text-xs">
                             Completed
                           </Badge>
                         )}
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 sm:p-4 lg:p-6">
-                    <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-                      {/* Topics - Ultra Mobile Optimized */}
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="space-y-4 sm:space-y-6">
+                      {/* Topics */}
                       {content.topics.length > 0 && (
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 text-sm lg:text-base">
-                            <BookOpen className="w-4 h-4 flex-shrink-0" />
+                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <BookOpen className="w-4 h-4" />
                             Topics Covered
                           </h4>
-                          <div className="space-y-1.5 sm:space-y-2">
+                          <div className="space-y-2">
                             {content.topics.map((topic, index) => (
-                              <div key={index} className="flex items-start gap-2 text-gray-700 p-2 sm:p-3 lg:p-3 bg-gray-50 rounded-lg">
-                                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></span>
-                                <span className="text-xs sm:text-sm lg:text-base break-words leading-relaxed">{topic}</span>
+                              <div key={index} className="flex items-start gap-2 text-gray-700 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                                <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                                <span className="text-sm sm:text-base break-words">{topic}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {/* Session Info & Videos - Ultra Responsive Layout */}
-                      <div className="space-y-3 sm:space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+                      {/* Session Info & Videos */}
+                      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
                         {content.session_date && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm lg:text-base">
-                              <Calendar className="w-4 h-4 flex-shrink-0" />
+                            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                              <Calendar className="w-4 h-4" />
                               Session Date
                             </h4>
-                            <p className="text-gray-700 text-xs sm:text-sm lg:text-base leading-relaxed">
+                            <p className="text-gray-700 text-sm sm:text-base">
                               {new Date(content.session_date).toLocaleDateString('en-US', {
                                 weekday: 'long',
                                 year: 'numeric',
@@ -408,23 +449,23 @@ const Dashboard = () => {
                           </div>
                         )}
 
-                        {/* Video Links - Ultra Mobile Optimized */}
+                        {/* Video Links */}
                         {content.gdrive_video_links.length > 0 && (
-                          <div className="lg:col-span-1">
-                            <h4 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 text-sm lg:text-base">
-                              <Video className="w-4 h-4 flex-shrink-0" />
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                              <Video className="w-4 h-4" />
                               Videos ({content.gdrive_video_links.length})
                             </h4>
-                            <div className="space-y-1.5 sm:space-y-2">
+                            <div className="space-y-2">
                               {content.gdrive_video_links.map((link, index) => (
-                                <div key={index} className="flex flex-col gap-1.5 sm:gap-2">
+                                <div key={index} className="flex flex-col gap-2">
                                   <a
                                     href={link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-xs sm:text-sm p-2 sm:p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors min-w-0"
+                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm p-2 sm:p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                   >
-                                    <Video className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                    <Video className="w-4 h-4 flex-shrink-0" />
                                     <span className="truncate flex-1">Video {index + 1}</span>
                                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                   </a>
@@ -432,7 +473,7 @@ const Dashboard = () => {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleVideoComplete(content.id)}
-                                    className="text-xs px-2 py-1 sm:px-3 sm:py-1.5 h-auto self-start"
+                                    className="text-xs self-start"
                                   >
                                     Mark Complete
                                   </Button>
@@ -443,13 +484,13 @@ const Dashboard = () => {
                         )}
                       </div>
 
-                      {/* Preparation Materials - Ultra Mobile Optimized */}
+                      {/* Preparation Materials */}
                       {content.preparation_materials && (
-                        <div className="p-2 sm:p-3 lg:p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                          <h4 className="font-semibold text-amber-800 mb-1.5 sm:mb-2 flex items-center gap-2 text-sm lg:text-base">
+                        <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                          <h4 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
                             📚 Preparation Materials
                           </h4>
-                          <p className="text-amber-700 text-xs sm:text-sm lg:text-base break-words leading-relaxed">
+                          <p className="text-amber-700 text-sm sm:text-base break-words">
                             {content.preparation_materials}
                           </p>
                         </div>

@@ -1,20 +1,23 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Users, Calendar, Award } from 'lucide-react';
+import { useUserStats } from '@/hooks/useUserStats';
 
 export const StatsCard = () => {
-  const stats = [
+  const { stats, loading } = useUserStats();
+
+  const statItems = [
     {
       title: 'Sessions Completed',
-      value: '8',
-      total: '12',
+      value: loading ? '...' : stats.sessionsCompleted.toString(),
+      total: loading ? '...' : stats.totalSessions.toString(),
       icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100'
     },
     {
       title: 'Study Streak',
-      value: '15',
+      value: loading ? '...' : stats.studyStreak.toString(),
       unit: 'days',
       icon: Calendar,
       color: 'text-green-600',
@@ -22,7 +25,7 @@ export const StatsCard = () => {
     },
     {
       title: 'Achievements',
-      value: '24',
+      value: loading ? '...' : stats.achievementsEarned.toString(),
       unit: 'earned',
       icon: Award,
       color: 'text-purple-600',
@@ -30,7 +33,7 @@ export const StatsCard = () => {
     },
     {
       title: 'Forum Posts',
-      value: '12',
+      value: loading ? '...' : stats.forumPosts.toString(),
       unit: 'posts',
       icon: Users,
       color: 'text-orange-600',
@@ -40,7 +43,7 @@ export const StatsCard = () => {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat, index) => (
+      {statItems.map((stat, index) => (
         <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

@@ -1,6 +1,8 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Users, Calendar, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StatsProps {
   stats: {
@@ -12,6 +14,54 @@ interface StatsProps {
 }
 
 export const QuickStats = ({ stats }: StatsProps) => {
+  const [engagementStats, setEngagementStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalPosts: 0,
+    totalAchievements: 0
+  });
+
+  useEffect(() => {
+    const fetchEngagementStats = async () => {
+      try {
+        // Get total users
+        const { count: totalUsers } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact' });
+
+        // Get active users (users with recent activity)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const { count: activeUsers } = await supabase
+          .from('user_activities')
+          .select('user_id', { count: 'exact' })
+          .gte('created_at', thirtyDaysAgo.toISOString());
+
+        // Get total posts
+        const { count: totalPosts } = await supabase
+          .from('discussion_posts')
+          .select('id', { count: 'exact' });
+
+        // Get total achievements earned
+        const { count: totalAchievements } = await supabase
+          .from('user_achievements')
+          .select('id', { count: 'exact' });
+
+        setEngagementStats({
+          totalUsers: totalUsers || 0,
+          activeUsers: activeUsers || 0,
+          totalPosts: totalPosts || 0,
+          totalAchievements: totalAchievements || 0
+        });
+      } catch (error) {
+        console.error('Error fetching engagement stats:', error);
+      }
+    };
+
+    fetchEngagementStats();
+  }, []);
+
   const statItems = [
     {
       title: 'Study Materials',
@@ -22,8 +72,8 @@ export const QuickStats = ({ stats }: StatsProps) => {
       borderColor: 'border-blue-200'
     },
     {
-      title: 'Questions & Answers',
-      value: stats.questions,
+      title: 'Discussion Posts',
+      value: engagementStats.totalPosts,
       icon: MessageCircle,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
@@ -38,8 +88,9 @@ export const QuickStats = ({ stats }: StatsProps) => {
       borderColor: 'border-purple-200'
     },
     {
-      title: 'Registered Users',
-      value: stats.users,
+      title: 'Active Users',
+      value: engagementStats.activeUsers,
+      total: engagementStats.totalUsers,
       icon: Users,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
@@ -58,7 +109,14 @@ export const QuickStats = ({ stats }: StatsProps) => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm text-gray-600 mb-1 truncate">{item.title}</p>
-                <p className={`text-xl sm:text-2xl font-bold ${item.color}`}>{item.value}</p>
+                <div className="flex items-center gap-1">
+                  <p className={`text-xl sm:text-2xl font-bold ${item.color}`}>
+                    {item.value}
+                  </p>
+                  {item.total && (
+                    <p className="text-sm text-gray-500">/ {item.total}</p>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>

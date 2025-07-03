@@ -40,29 +40,31 @@ export const useAdminStats = () => {
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Get active users (users with recent activity)
+      // Get active users (users with activity in last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const { count: activeUsers } = await supabase
+      const { data: recentSessions } = await supabase
         .from('user_study_sessions')
-        .select('user_id', { count: 'exact', head: true })
+        .select('user_id')
         .gte('created_at', sevenDaysAgo.toISOString());
+
+      const activeUsers = new Set(recentSessions?.map(s => s.user_id) || []).size;
 
       // Get user progress data
       const { data: progressData } = await supabase
         .from('user_progress')
         .select('*');
 
-      // Calculate completion rate
-      const completedUsers = progressData?.filter(p => p.is_completed).length || 0;
-      const completionRate = totalUsers ? (completedUsers / totalUsers!) * 100 : 0;
+      // Calculate completion rate (users who completed at least one week)
+      const usersWithProgress = new Set(progressData?.filter(p => p.is_completed).map(p => p.user_id) || []).size;
+      const completionRate = totalUsers && totalUsers > 0 ? (usersWithProgress / totalUsers) * 100 : 0;
 
       // Calculate average progress score
       const totalPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
-      const avgProgressScore = totalUsers ? totalPoints / totalUsers! : 0;
+      const avgProgressScore = totalUsers && totalUsers > 0 ? totalPoints / totalUsers : 0;
 
-      // Get top performers
+      // Get top performers (real data, limited to actual users)
       const { data: topPerformersData } = await supabase
         .from('user_progress')
         .select(`
@@ -71,33 +73,73 @@ export const useAdminStats = () => {
           study_streak,
           profiles!user_progress_user_id_fkey(full_name)
         `)
+        .not('total_points', 'is', null)
         .order('total_points', { ascending: false })
         .limit(5);
 
-      const topPerformers = topPerformersData?.map(p => ({
+      // Remove duplicates and format top performers
+      const uniquePerformers = new Map();
+      topPerformersData?.forEach(p => {
+        const userId = p.user_id;
+        const existing = uniquePerformers.get(userId);
+        if (!existing || (p.total_points || 0) > (existing.total_points || 0)) {
+          uniquePerformers.set(userId, p);
+        }
+      });
+
+      const topPerformers = Array.from(uniquePerformers.values()).map(p => ({
         id: p.user_id,
-        name: (p.profiles as any)?.full_name || 'Unknown User',
+        name: (p.profiles as any)?.full_name || 'Anonymous User',
         points: p.total_points || 0,
         streak: p.study_streak || 0,
         completedWeeks: progressData?.filter(prog => 
           prog.user_id === p.user_id && prog.is_completed
         ).length || 0
-      })) || [];
+      })).slice(0, 3); // Limit to top 3 to avoid duplicates
 
-      // Generate weekly engagement data (simplified)
-      const weeklyEngagement = Array.from({ length: 4 }, (_, i) => ({
-        week: `Week ${i + 1}`,  
-        users: Math.floor((activeUsers || 0) * (0.7 + Math.random() * 0.3)),
-        sessions: Math.floor((activeUsers || 0) * (1.2 + Math.random() * 0.8)),
-        completion: Math.floor(60 + Math.random() * 30)
-      }));
+      // Generate weekly engagement data based on actual sessions
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data: recentSessionsForWeeks } = await supabase
+        .from('user_study_sessions')
+        .select('created_at, user_id, completed')
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
+      // Group sessions by week
+      const weeklyData = [];
+      for (let i = 3; i >= 0; i--) {
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - (i * 7 + 6));
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekEnd = new Date();
+        weekEnd.setDate(weekEnd.getDate() - (i * 7));
+        weekEnd.setHours(23, 59, 59, 999);
+
+        const weekSessions = recentSessionsForWeeks?.filter(session => {
+          const sessionDate = new Date(session.created_at);
+          return sessionDate >= weekStart && sessionDate <= weekEnd;
+        }) || [];
+
+        const uniqueUsers = new Set(weekSessions.map(s => s.user_id)).size;
+        const completedSessions = weekSessions.filter(s => s.completed).length;
+        const completionRate = weekSessions.length > 0 ? Math.round((completedSessions / weekSessions.length) * 100) : 0;
+
+        weeklyData.push({
+          week: `Week ${4 - i}`,
+          users: uniqueUsers,
+          sessions: weekSessions.length,
+          completion: completionRate
+        });
+      }
 
       setStats({
         totalUsers: totalUsers || 0,
-        activeUsers: activeUsers || 0,
+        activeUsers,
         completionRate: Math.round(completionRate),
         avgProgressScore: Math.round(avgProgressScore),
-        weeklyEngagement,
+        weeklyEngagement: weeklyData,
         topPerformers
       });
 

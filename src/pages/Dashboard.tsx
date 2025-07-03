@@ -196,17 +196,26 @@ const Dashboard = () => {
           user_id: user.id,
           content_id: sessionId,
           completed: true,
-          session_duration: 60 // Default 60 minutes
+          session_duration: 60
         });
 
       if (sessionError) throw sessionError;
 
-      // Update user progress
+      // Get the content to find its week number
+      const { data: contentData } = await supabase
+        .from('course_content')
+        .select('week_number')
+        .eq('id', sessionId)
+        .single();
+
+      const weekNumber = contentData?.week_number || 1;
+
+      // Update or create user progress
       const { data: existingProgress } = await supabase
         .from('user_progress')
         .select('*')
         .eq('user_id', user.id)
-        .eq('week_number', 1) // Assuming week 1 for now
+        .eq('week_number', weekNumber)
         .single();
 
       if (existingProgress) {
@@ -215,6 +224,7 @@ const Dashboard = () => {
           .from('user_progress')
           .update({
             total_points: (existingProgress.total_points || 0) + 50,
+            study_streak: Math.max((existingProgress.study_streak || 0), 1),
             updated_at: new Date().toISOString()
           })
           .eq('id', existingProgress.id);
@@ -226,7 +236,7 @@ const Dashboard = () => {
           .from('user_progress')
           .insert({
             user_id: user.id,
-            week_number: 1,
+            week_number: weekNumber,
             total_points: 50,
             study_streak: 1
           });
@@ -238,14 +248,20 @@ const Dashboard = () => {
       markSessionComplete(sessionId);
       
       toast({
-        title: 'Progress Updated',
-        description: 'Session marked as completed! +50 points earned.',
+        title: 'Session Completed! 🎉',
+        description: 'Great job! +50 points earned for completing this session.',
       });
+
+      // Refresh data to show updated progress
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
     } catch (error) {
       console.error('Error completing session:', error);
       toast({
         title: 'Error',
-        description: 'Failed to mark session as complete',
+        description: 'Failed to mark session as complete. Please try again.',
         variant: 'destructive',
       });
     }
@@ -327,7 +343,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 lg:py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-6 lg:py-8 max-w-7xl">
         {/* Desktop Header */}
         <div className="hidden lg:flex justify-between items-center mb-6 lg:mb-8">
           <div>
@@ -362,13 +378,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Enhanced Dashboard Layout */}
-        <div className="space-y-4 sm:space-y-6">
+        {/* Enhanced Dashboard Layout with improved spacing */}
+        <div className="space-y-8">
           {/* User Profile Card */}
           <UserProfileCard profile={profile} />
 
           {/* Progress and Streak Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <ProgressTracker 
                 totalWeeks={progress.totalWeeks}
@@ -382,13 +398,13 @@ const Dashboard = () => {
           </div>
 
           {/* Stats and Learning Path */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <StatsCard />
             <LearningPath />
           </div>
 
           {/* Engagement Features */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AchievementsPanel />
             <Leaderboard />
           </div>
@@ -397,7 +413,7 @@ const Dashboard = () => {
           <QuickActions />
 
           {/* Community Features */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <DiscussionForum />
             </div>
@@ -415,72 +431,79 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Course Content Section */}
-        <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
-          <div className="flex items-center gap-2 mb-4">
-            <BookOpen className="w-6 h-6 text-blue-600" />
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Course Content</h2>
+        {/* Course Content Section with improved design */}
+        <div className="mt-8 space-y-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <BookOpen className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Course Content</h2>
+              <p className="text-sm text-gray-600">Access your learning materials and track progress</p>
+            </div>
           </div>
           
           {filteredContent.length === 0 ? (
             <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-6 sm:p-8 text-center">
-                <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2">
+              <CardContent className="p-12 text-center">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <BookOpen className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-600 mb-3">
                   {searchQuery || activeFilter !== 'all' ? 'No matching content found' : 'No Content Available'}
                 </h3>
-                <p className="text-sm sm:text-base text-gray-500 max-w-md mx-auto">
+                <p className="text-gray-500 max-w-md mx-auto leading-relaxed">
                   {searchQuery || activeFilter !== 'all' 
-                    ? 'Try adjusting your search or filter criteria.'
-                    : 'Course content will be published here as the bootcamp progresses.'
+                    ? 'Try adjusting your search or filter criteria to find what you\'re looking for.'
+                    : 'Course content will be published here as the bootcamp progresses. Check back soon for new materials!'
                   }
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
               {filteredContent.map((content) => (
-                <Card key={content.id} className="shadow-lg border-0 bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-[1.01] overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 sm:p-6">
-                    <div className="flex justify-between items-start gap-3">
+                <Card key={content.id} className="shadow-lg border-0 bg-white/95 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
+                    <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base sm:text-xl mb-2 break-words">
+                        <CardTitle className="text-xl mb-3 break-words leading-tight">
                           {content.title}
                         </CardTitle>
                         {content.description && (
-                          <p className="text-blue-100 text-sm sm:text-base break-words">
+                          <p className="text-blue-100 leading-relaxed">
                             {content.description}
                           </p>
                         )}
                       </div>
                       <div className="flex flex-col gap-2 flex-shrink-0">
                         {content.week_number && (
-                          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
+                          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 font-medium">
                             Week {content.week_number}
                           </Badge>
                         )}
                         {progress.completedSessions.includes(content.id) && (
-                          <Badge className="bg-green-600 text-white text-xs">
-                            Completed
+                          <Badge className="bg-green-600 text-white font-medium">
+                            ✓ Completed
                           </Badge>
                         )}
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="space-y-4 sm:space-y-6">
+                  <CardContent className="p-6">
+                    <div className="space-y-6">
                       {/* Topics */}
                       {content.topics.length > 0 && (
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                            <BookOpen className="w-4 h-4" />
+                          <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-blue-600" />
                             Topics Covered
                           </h4>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {content.topics.map((topic, index) => (
-                              <div key={index} className="flex items-start gap-2 text-gray-700 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                              <div key={index} className="flex items-start gap-3 text-gray-700 p-3 bg-gray-50 rounded-lg border border-gray-100">
                                 <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-                                <span className="text-sm sm:text-base break-words">{topic}</span>
+                                <span className="break-words leading-relaxed">{topic}</span>
                               </div>
                             ))}
                           </div>
@@ -488,14 +511,14 @@ const Dashboard = () => {
                       )}
 
                       {/* Session Info & Videos */}
-                      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+                      <div className="space-y-6">
                         {content.session_date && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                            <h4 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                              <Calendar className="w-5 h-5" />
                               Session Date
                             </h4>
-                            <p className="text-gray-700 text-sm sm:text-base">
+                            <p className="text-amber-700 font-medium">
                               {new Date(content.session_date).toLocaleDateString('en-US', {
                                 weekday: 'long',
                                 year: 'numeric',
@@ -509,31 +532,31 @@ const Dashboard = () => {
                         {/* Video Links */}
                         {content.gdrive_video_links.length > 0 && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                              <Video className="w-4 h-4" />
-                              Videos ({content.gdrive_video_links.length})
+                            <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                              <Video className="w-5 h-5 text-purple-600" />
+                              Session Videos ({content.gdrive_video_links.length})
                             </h4>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               {content.gdrive_video_links.map((link, index) => (
-                                <div key={index} className="flex flex-col gap-2">
+                                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
                                   <a
                                     href={link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm p-2 sm:p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                    className="flex items-center gap-3 text-blue-600 hover:text-blue-800 font-medium p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                   >
-                                    <Video className="w-4 h-4 flex-shrink-0" />
-                                    <span className="truncate flex-1">Video {index + 1}</span>
-                                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                    <Video className="w-5 h-5 flex-shrink-0" />
+                                    <span className="flex-1">Session Video {index + 1}</span>
+                                    <ExternalLink className="w-4 h-4 flex-shrink-0" />
                                   </a>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleVideoComplete(content.id)}
-                                    className="text-xs self-start"
-                                  >
-                                    Mark Complete
-                                  </Button>
+                                  {!progress.completedSessions.includes(content.id) && (
+                                    <Button
+                                      onClick={() => handleVideoComplete(content.id)}
+                                      className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2"
+                                    >
+                                      Mark Session Complete (+50 Points)
+                                    </Button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -543,11 +566,11 @@ const Dashboard = () => {
 
                       {/* Preparation Materials */}
                       {content.preparation_materials && (
-                        <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                          <h4 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
                             📚 Preparation Materials
                           </h4>
-                          <p className="text-amber-700 text-sm sm:text-base break-words">
+                          <p className="text-blue-700 leading-relaxed">
                             {content.preparation_materials}
                           </p>
                         </div>

@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarContent, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Trophy, Medal, Award, TrendingUp, User, Crown } from 'lucide-react';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useState } from 'react';
@@ -153,9 +153,8 @@ export const InteractiveLeaderboard = () => {
 
                   {/* Avatar */}
                   <Avatar className="w-10 h-10 border-2 border-white shadow-sm">
-                    <AvatarContent>{entry.full_name.charAt(0)}</AvatarContent>
                     <AvatarFallback>
-                      <User className="w-5 h-5" />
+                      {entry.full_name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
 

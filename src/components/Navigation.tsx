@@ -7,12 +7,11 @@ import {
   BookOpen, 
   MessageSquare, 
   Trophy, 
-  Settings, 
   LogOut, 
   Menu, 
   X,
-  User,
-  Calendar
+  TrendingUp,
+  Users
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -37,14 +36,14 @@ export const Navigation = ({ isAdmin = false }: NavigationProps) => {
 
   const navigationItems = [
     { to: '/dashboard', icon: Home, label: 'Dashboard' },
-    { to: '/dashboard', icon: BookOpen, label: 'Course Content' },
-    { to: '/dashboard', icon: MessageSquare, label: 'Discussion' },
-    { to: '/dashboard', icon: Trophy, label: 'Leaderboard' },
-    { to: '/dashboard', icon: Calendar, label: 'Schedule' },
+    { to: '/course-content', icon: BookOpen, label: 'Course Content' },
+    { to: '/progress', icon: TrendingUp, label: 'Progress' },
+    { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
+    { to: '/community', icon: MessageSquare, label: 'Community' },
   ];
 
   if (isAdmin) {
-    navigationItems.push({ to: '/admin', icon: Settings, label: 'Admin Panel' });
+    navigationItems.push({ to: '/admin', icon: Users, label: 'Admin Panel' });
   }
 
   const NavItem = ({ to, icon: Icon, label, onClick }: any) => (
@@ -70,9 +69,9 @@ export const Navigation = ({ isAdmin = false }: NavigationProps) => {
       <nav className="hidden lg:flex bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <NavLink to="/dashboard" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Frontend Pro
-            </h1>
+            </NavLink>
             <div className="flex items-center gap-2">
               {navigationItems.map((item) => (
                 <NavItem key={item.to + item.label} {...item} />
@@ -93,9 +92,9 @@ export const Navigation = ({ isAdmin = false }: NavigationProps) => {
       {/* Mobile Navigation */}
       <nav className="lg:hidden bg-white border-b border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <NavLink to="/dashboard" className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Frontend Pro
-          </h1>
+          </NavLink>
           <Button
             variant="ghost"
             size="sm"

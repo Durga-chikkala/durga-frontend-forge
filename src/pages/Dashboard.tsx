@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,8 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, Video, ExternalLink, Calendar } from 'lucide-react';
-import { SearchAndFilter } from '@/components/dashboard/SearchAndFilter';
-import { ProgressTracker } from '@/components/dashboard/ProgressTracker';
 import { UserProfileCard } from '@/components/dashboard/UserProfileCard';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -18,8 +15,11 @@ import { LearningPath } from '@/components/dashboard/LearningPath';
 import { AchievementsPanel } from '@/components/dashboard/AchievementsPanel';
 import { StudyStreak } from '@/components/dashboard/StudyStreak';
 import { DiscussionForum } from '@/components/dashboard/DiscussionForum';
-import { Leaderboard } from '@/components/dashboard/Leaderboard';
 import { Navigation } from '@/components/Navigation';
+import { AdvancedProgressTracker } from '@/components/dashboard/AdvancedProgressTracker';
+import { AdvancedSearchFilter, FilterOptions } from '@/components/dashboard/AdvancedSearchFilter';
+import { RealTimeNotifications } from '@/components/dashboard/RealTimeNotifications';
+import { InteractiveLeaderboard } from '@/components/dashboard/InteractiveLeaderboard';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
 
 interface CourseContent {
@@ -45,7 +45,14 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilters, setActiveFilters] = useState<FilterOptions>({
+    category: 'all',
+    difficulty: 'all',
+    duration: 'all',
+    status: 'all',
+    week: 'all',
+    dateRange: 'all'
+  });
   const [isAdmin, setIsAdmin] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -65,7 +72,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     filterContent();
-  }, [courseContent, searchQuery, activeFilter]);
+  }, [courseContent, searchQuery, activeFilters]);
 
   useEffect(() => {
     if (user) {
@@ -145,6 +152,7 @@ const Dashboard = () => {
   const filterContent = () => {
     let filtered = courseContent;
 
+    // Search filter
     if (searchQuery) {
       filtered = filtered.filter(content =>
         content.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -153,17 +161,43 @@ const Dashboard = () => {
       );
     }
 
-    if (activeFilter !== 'all') {
+    // Advanced filters
+    if (activeFilters.week !== 'all') {
+      const weekNumber = parseInt(activeFilters.week.replace('week', ''));
+      filtered = filtered.filter(content => content.week_number === weekNumber);
+    }
+
+    if (activeFilters.status !== 'all') {
       filtered = filtered.filter(content => {
-        switch (activeFilter) {
-          case 'week1':
-            return content.week_number === 1;
-          case 'week2':
-            return content.week_number === 2;
-          case 'upcoming':
-            return content.session_date && new Date(content.session_date) > new Date();
+        const isCompleted = progress.completedSessions.includes(content.id);
+        switch (activeFilters.status) {
           case 'completed':
-            return content.session_date && new Date(content.session_date) < new Date();
+            return isCompleted;
+          case 'not-started':
+            return !isCompleted;
+          case 'in-progress':
+            return false; // For now, we don't track in-progress
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (activeFilters.dateRange !== 'all') {
+      const now = new Date();
+      filtered = filtered.filter(content => {
+        if (!content.session_date) return true;
+        const sessionDate = new Date(content.session_date);
+        
+        switch (activeFilters.dateRange) {
+          case 'upcoming':
+            return sessionDate > now;
+          case 'past':
+            return sessionDate < now;
+          case 'this-week':
+            const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+            const weekEnd = new Date(now.setDate(now.getDate() - now.getDay() + 6));
+            return sessionDate >= weekStart && sessionDate <= weekEnd;
           default:
             return true;
         }
@@ -230,6 +264,16 @@ const Dashboard = () => {
         if (insertError) throw insertError;
       }
 
+      // Add user activity
+      await supabase
+        .from('user_activities')
+        .insert({
+          user_id: user.id,
+          activity_type: 'session_complete',
+          description: `Completed session: ${courseContent.find(c => c.id === sessionId)?.title}`,
+          points_earned: 50
+        });
+
       markSessionComplete(sessionId);
       
       toast({
@@ -256,7 +300,7 @@ const Dashboard = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm sm:text-base">Loading your dashboard...</p>
+          <p className="text-gray-600 text-sm sm:text-base">Loading your advanced dashboard...</p>
         </div>
       </div>
     );
@@ -264,43 +308,48 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Navigation */}
-      <Navigation isAdmin={isAdmin} />
+      {/* Enhanced Navigation with Notifications */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
+          <Navigation isAdmin={isAdmin} />
+          <RealTimeNotifications />
+        </div>
+      </div>
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            Welcome back, {profile?.full_name || 'Student'}!
+        {/* Enhanced Welcome Section */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
+            Welcome back, {profile?.full_name || 'Student'}! 🚀
           </h1>
-          <p className="text-gray-600 text-lg">Continue your frontend development journey</p>
+          <p className="text-gray-600 text-xl">Continue your advanced frontend development journey</p>
         </div>
 
-        {/* Dashboard Content */}
+        {/* Enhanced Dashboard Content */}
         <div className="space-y-8">
           {/* User Profile Card */}
           <UserProfileCard profile={profile} />
 
-          {/* Progress and Streak Section */}
+          {/* Advanced Progress and Streak Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <ProgressTracker />
+              <AdvancedProgressTracker />
             </div>
             <div>
               <StudyStreak />
             </div>
           </div>
 
-          {/* Stats and Learning Path */}
+          {/* Stats and Interactive Leaderboard */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <StatsCard />
-            <LearningPath />
+            <InteractiveLeaderboard />
           </div>
 
-          {/* Engagement Features */}
+          {/* Learning Path and Achievements */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <LearningPath />
             <AchievementsPanel />
-            <Leaderboard />
           </div>
 
           {/* Quick Actions */}
@@ -316,38 +365,40 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Search and Filter */}
-          <SearchAndFilter
+          {/* Advanced Search and Filter */}
+          <AdvancedSearchFilter
             onSearch={setSearchQuery}
-            onFilter={setActiveFilter}
-            activeFilter={activeFilter}
+            onFilter={setActiveFilters}
             searchQuery={searchQuery}
+            activeFilters={activeFilters}
           />
         </div>
 
-        {/* Course Content Section */}
+        {/* Enhanced Course Content Section */}
         <div className="mt-12 space-y-8">
           <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <BookOpen className="w-7 h-7 text-blue-600" />
+            <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+              <BookOpen className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">Course Content</h2>
-              <p className="text-gray-600 mt-1">Access your learning materials and track progress</p>
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Course Content
+              </h2>
+              <p className="text-gray-600 mt-2 text-lg">Access your learning materials and track progress</p>
             </div>
           </div>
           
           {filteredContent.length === 0 ? (
-            <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
-              <CardContent className="p-16 text-center">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-8">
-                  <BookOpen className="w-12 h-12 text-gray-400" />
+            <Card className="shadow-2xl border-0 bg-gradient-to-br from-gray-50 to-white backdrop-blur-sm">
+              <CardContent className="p-20 text-center">
+                <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-8">
+                  <BookOpen className="w-16 h-16 text-blue-500" />
                 </div>
-                <h3 className="text-2xl font-semibold text-gray-600 mb-4">
-                  {searchQuery || activeFilter !== 'all' ? 'No matching content found' : 'No Content Available'}
+                <h3 className="text-3xl font-bold text-gray-700 mb-6">
+                  {searchQuery || Object.values(activeFilters).some(v => v !== 'all') ? 'No matching content found' : 'No Content Available'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto text-lg leading-relaxed">
-                  {searchQuery || activeFilter !== 'all' 
+                <p className="text-gray-500 max-w-lg mx-auto text-xl leading-relaxed">
+                  {searchQuery || Object.values(activeFilters).some(v => v !== 'all')
                     ? 'Try adjusting your search or filter criteria to find what you\'re looking for.'
                     : 'Course content will be published here as the bootcamp progresses. Check back soon for new materials!'
                   }
@@ -357,8 +408,8 @@ const Dashboard = () => {
           ) : (
             <div className="grid gap-8 lg:grid-cols-2">
               {filteredContent.map((content) => (
-                <Card key={content.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] overflow-hidden group">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-8">
+                <Card key={content.id} className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] overflow-hidden group">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white p-8">
                     <div className="flex justify-between items-start gap-6">
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-2xl mb-4 break-words leading-tight group-hover:text-blue-100 transition-colors">
@@ -377,7 +428,7 @@ const Dashboard = () => {
                           </Badge>
                         )}
                         {progress.completedSessions.includes(content.id) && (
-                          <Badge className="bg-green-600 text-white font-medium text-sm px-4 py-2">
+                          <Badge className="bg-green-500 text-white font-medium text-sm px-4 py-2 shadow-lg">
                             ✓ Completed
                           </Badge>
                         )}
@@ -385,6 +436,7 @@ const Dashboard = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="p-8">
+                    
                     <div className="space-y-8">
                       {/* Topics */}
                       {content.topics.length > 0 && (
@@ -446,9 +498,9 @@ const Dashboard = () => {
                                   {!progress.completedSessions.includes(content.id) && (
                                     <Button
                                       onClick={() => handleVideoComplete(content.id)}
-                                      className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300"
+                                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300"
                                     >
-                                      Mark Session Complete (+50 Points)
+                                      Mark Session Complete (+50 Points) ⭐
                                     </Button>
                                   )}
                                 </div>

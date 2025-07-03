@@ -78,7 +78,7 @@ export const QuickActions = () => {
       />
       <QuestionModal 
         isOpen={activeModal === 'question'} 
-        onClose={() => setActiveModal(null)} 
+        onOpenChange={(open) => setActiveModal(open ? 'question' : null)} 
       />
       <DownloadsModal 
         isOpen={activeModal === 'downloads'} 

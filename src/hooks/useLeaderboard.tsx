@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +21,7 @@ export const useLeaderboard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Get user progress with points
+        // Get user progress with points - deduplicated by user
         const { data: progressData } = await supabase
           .from('user_progress')
           .select(`
@@ -31,7 +30,20 @@ export const useLeaderboard = () => {
             study_streak,
             profiles!user_progress_user_id_fkey(full_name)
           `)
+          .not('total_points', 'is', null)
           .order('total_points', { ascending: false });
+
+        // Deduplicate by user_id and keep highest points
+        const userMap = new Map();
+        progressData?.forEach(entry => {
+          const userId = entry.user_id;
+          const existing = userMap.get(userId);
+          if (!existing || (entry.total_points || 0) > (existing.total_points || 0)) {
+            userMap.set(userId, entry);
+          }
+        });
+
+        const uniqueProgressData = Array.from(userMap.values());
 
         // Get achievement counts per user
         const { data: achievementData } = await supabase
@@ -53,7 +65,7 @@ export const useLeaderboard = () => {
           return acc;
         }, {} as Record<string, number>) || {};
 
-        const leaderboardData = progressData?.map((entry, index) => ({
+        const leaderboardData = uniqueProgressData.map((entry, index) => ({
           user_id: entry.user_id,
           full_name: entry.profiles?.full_name || 'Unknown User',
           total_points: entry.total_points || 0,
@@ -62,7 +74,7 @@ export const useLeaderboard = () => {
           posts_count: postCounts[entry.user_id] || 0,
           rank: index + 1,
           isCurrentUser: entry.user_id === user?.id
-        })) || [];
+        }));
 
         setLeaderboard(leaderboardData.slice(0, 10));
       } catch (error) {

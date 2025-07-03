@@ -10,6 +10,7 @@ interface PathItem {
   status: 'completed' | 'current' | 'locked';
   week: number;
   estimatedTime: string;
+  sessionDate?: string;
 }
 
 export const useLearningPath = () => {
@@ -18,7 +19,10 @@ export const useLearningPath = () => {
   const { user } = useAuth();
 
   const fetchLearningPath = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       // Get course content to build learning path
@@ -28,32 +32,44 @@ export const useLearningPath = () => {
         .eq('is_published', true)
         .order('week_number', { ascending: true });
 
-      // Get user progress
+      // Get user's completed sessions
+      const { data: completedSessions } = await supabase
+        .from('user_study_sessions')
+        .select('content_id')
+        .eq('user_id', user.id)
+        .eq('completed', true);
+
+      const completedContentIds = new Set(completedSessions?.map(s => s.content_id) || []);
+
+      // Get user progress to determine current week
       const { data: progressData } = await supabase
         .from('user_progress')
-        .select('*')
+        .select('week_number, is_completed')
         .eq('user_id', user.id);
 
-      const completedWeeks = progressData?.map(p => p.week_number) || [];
-      const maxCompletedWeek = Math.max(...completedWeeks, 0);
+      const completedWeeks = new Set(
+        progressData?.filter(p => p.is_completed).map(p => p.week_number) || []
+      );
+      const maxCompletedWeek = Math.max(...Array.from(completedWeeks), 0);
 
       const items: PathItem[] = courseData?.map((content, index) => {
         const weekNumber = content.week_number || index + 1;
         let status: 'completed' | 'current' | 'locked' = 'locked';
         
-        if (completedWeeks.includes(weekNumber)) {
+        if (completedContentIds.has(content.id) || completedWeeks.has(weekNumber)) {
           status = 'completed';
-        } else if (weekNumber === maxCompletedWeek + 1) {
+        } else if (weekNumber === maxCompletedWeek + 1 || (maxCompletedWeek === 0 && weekNumber === 1)) {
           status = 'current';
         }
 
         return {
           id: content.id,
           title: content.title,
-          description: content.description || 'Learn essential concepts',
+          description: content.description || 'Learn essential frontend concepts',
           status,
           week: weekNumber,
-          estimatedTime: `${8 + weekNumber * 2} hours`
+          estimatedTime: `${Math.max(6, weekNumber * 2)} hours`,
+          sessionDate: content.session_date || undefined
         };
       }) || [];
 

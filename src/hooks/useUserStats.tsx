@@ -9,6 +9,7 @@ interface UserStats {
   studyStreak: number;
   achievementsEarned: number;
   forumPosts: number;
+  totalPoints: number;
 }
 
 export const useUserStats = () => {
@@ -17,7 +18,8 @@ export const useUserStats = () => {
     totalSessions: 0,
     studyStreak: 0,
     achievementsEarned: 0,
-    forumPosts: 0
+    forumPosts: 0,
+    totalPoints: 0
   });
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -40,12 +42,12 @@ export const useUserStats = () => {
           .select('id')
           .eq('is_published', true);
 
-        // Get current study streak
+        // Get current study streak and total points
         const { data: progress } = await supabase
           .from('user_progress')
-          .select('study_streak')
+          .select('study_streak, total_points')
           .eq('user_id', user.id)
-          .order('study_streak', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(1);
 
         // Get earned achievements
@@ -60,12 +62,24 @@ export const useUserStats = () => {
           .select('id')
           .eq('user_id', user.id);
 
+        // Calculate total points from user activities if no progress record exists
+        let totalPoints = progress?.[0]?.total_points || 0;
+        if (totalPoints === 0) {
+          const { data: activities } = await supabase
+            .from('user_activities')
+            .select('points_earned')
+            .eq('user_id', user.id);
+          
+          totalPoints = activities?.reduce((sum, activity) => sum + (activity.points_earned || 0), 0) || 0;
+        }
+
         setStats({
           sessionsCompleted: completedSessions?.length || 0,
           totalSessions: totalSessions?.length || 0,
           studyStreak: progress?.[0]?.study_streak || 0,
           achievementsEarned: achievements?.length || 0,
-          forumPosts: posts?.length || 0
+          forumPosts: posts?.length || 0,
+          totalPoints: totalPoints
         });
       } catch (error) {
         console.error('Error fetching user stats:', error);

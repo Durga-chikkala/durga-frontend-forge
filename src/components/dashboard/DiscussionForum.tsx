@@ -3,12 +3,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { MessageSquare, Heart, Clock, Plus, TrendingUp } from 'lucide-react';
+import { MessageSquare, Heart, Clock, Plus, TrendingUp, Send } from 'lucide-react';
 import { useDiscussionPosts } from '@/hooks/useDiscussionPosts';
 import { formatDistanceToNow } from 'date-fns';
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export const DiscussionForum = () => {
-  const { posts, loading, refetch } = useDiscussionPosts();
+  const { posts, loading, refetch, createPost } = useDiscussionPosts();
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newPost, setNewPost] = useState({
+    title: '',
+    content: '',
+    category: 'general'
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getCategoryColor = (category: string) => {
     const colors = {
@@ -23,6 +34,21 @@ export const DiscussionForum = () => {
   const getInitials = (name: string) => {
     if (!name || name === 'Anonymous User') return 'AU';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const handleCreatePost = async () => {
+    if (!newPost.title.trim() || !newPost.content.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    const success = await createPost(newPost.title, newPost.content, newPost.category);
+    
+    if (success) {
+      setNewPost({ title: '', content: '', category: 'general' });
+      setShowCreateForm(false);
+    }
+    setIsSubmitting(false);
   };
 
   if (loading) {
@@ -65,26 +91,91 @@ export const DiscussionForum = () => {
               {posts.length} posts
             </Badge>
           </CardTitle>
-          <Button 
-            size="sm" 
-            className="bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => {
-              console.log('Refreshing discussion posts...');
-              refetch();
-            }}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => {
+                console.log('Refreshing discussion posts...');
+                refetch();
+              }}
+            >
+              <TrendingUp className="w-4 h-4 mr-1" />
+              Refresh
+            </Button>
+            <Button 
+              size="sm" 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => setShowCreateForm(!showCreateForm)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              New Post
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
+        {showCreateForm && (
+          <div className="mb-6 p-4 border rounded-lg bg-green-50">
+            <h4 className="font-semibold text-green-800 mb-3">Create New Discussion</h4>
+            <div className="space-y-3">
+              <Input
+                placeholder="Post title..."
+                value={newPost.title}
+                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+              />
+              <Textarea
+                placeholder="What would you like to discuss?"
+                value={newPost.content}
+                onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                rows={3}
+              />
+              <div className="flex items-center gap-3">
+                <Select value={newPost.category} onValueChange={(value) => setNewPost({ ...newPost, category: value })}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="help">Help</SelectItem>
+                    <SelectItem value="showcase">Showcase</SelectItem>
+                    <SelectItem value="feedback">Feedback</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={handleCreatePost}
+                  disabled={isSubmitting || !newPost.title.trim() || !newPost.content.trim()}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Send className="w-4 h-4 mr-1" />
+                  {isSubmitting ? 'Posting...' : 'Post'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {!posts || posts.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 mb-2">No discussions yet</p>
               <p className="text-sm text-gray-400">Start a conversation with your peers!</p>
+              <Button 
+                className="mt-4 bg-green-600 hover:bg-green-700"
+                onClick={() => setShowCreateForm(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Create First Post
+              </Button>
             </div>
           ) : (
             posts.map((post) => (
@@ -144,15 +235,6 @@ export const DiscussionForum = () => {
             ))
           )}
         </div>
-        
-        {posts && posts.length > 0 && (
-          <div className="mt-6 text-center">
-            <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              View All Discussions
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

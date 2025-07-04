@@ -25,10 +25,15 @@ export const useUserStats = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const fetchStats = async () => {
       try {
+        console.log('Fetching user stats for user:', user.id);
+
         // Get completed sessions
         const { data: completedSessions } = await supabase
           .from('user_study_sessions')
@@ -42,13 +47,19 @@ export const useUserStats = () => {
           .select('id')
           .eq('is_published', true);
 
-        // Get current study streak and total points
+        // Get current study streak and total points from progress
         const { data: progress } = await supabase
           .from('user_progress')
           .select('study_streak, total_points')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1);
+
+        // Get total points from activities
+        const { data: activities } = await supabase
+          .from('user_activities')
+          .select('points_earned')
+          .eq('user_id', user.id);
 
         // Get earned achievements
         const { data: achievements } = await supabase
@@ -62,27 +73,33 @@ export const useUserStats = () => {
           .select('id')
           .eq('user_id', user.id);
 
-        // Calculate total points from user activities if no progress record exists
-        let totalPoints = progress?.[0]?.total_points || 0;
-        if (totalPoints === 0) {
-          const { data: activities } = await supabase
-            .from('user_activities')
-            .select('points_earned')
-            .eq('user_id', user.id);
-          
-          totalPoints = activities?.reduce((sum, activity) => sum + (activity.points_earned || 0), 0) || 0;
-        }
+        // Calculate total points from both progress and activities
+        const progressPoints = progress?.[0]?.total_points || 0;
+        const activityPoints = activities?.reduce((sum, activity) => sum + (activity.points_earned || 0), 0) || 0;
+        const totalPoints = progressPoints + activityPoints;
 
-        setStats({
+        const newStats = {
           sessionsCompleted: completedSessions?.length || 0,
           totalSessions: totalSessions?.length || 0,
           studyStreak: progress?.[0]?.study_streak || 0,
           achievementsEarned: achievements?.length || 0,
           forumPosts: posts?.length || 0,
           totalPoints: totalPoints
-        });
+        };
+
+        console.log('User stats calculated:', newStats);
+        setStats(newStats);
       } catch (error) {
         console.error('Error fetching user stats:', error);
+        // Set default stats on error
+        setStats({
+          sessionsCompleted: 0,
+          totalSessions: 0,
+          studyStreak: 0,
+          achievementsEarned: 0,
+          forumPosts: 0,
+          totalPoints: 0
+        });
       } finally {
         setLoading(false);
       }

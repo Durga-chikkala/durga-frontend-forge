@@ -11,6 +11,8 @@ export const useInitializeUserData = () => {
       if (!user) return;
 
       try {
+        console.log('Initializing user data for:', user.id);
+
         // Check if user has any progress data
         const { data: existingProgress } = await supabase
           .from('user_progress')
@@ -55,8 +57,8 @@ export const useInitializeUserData = () => {
             .insert({
               user_id: user.id,
               activity_type: 'login',
-              description: 'User logged in for the first time',
-              points_earned: 10
+              description: 'Welcome! You joined the platform successfully.',
+              points_earned: 20
             });
 
           if (error) {
@@ -65,6 +67,29 @@ export const useInitializeUserData = () => {
             console.log('Initial activity data created successfully');
           }
         }
+
+        // Ensure user has a role assigned
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!userRole) {
+          console.log('Assigning default role to user:', user.id);
+          
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: user.id,
+              role: 'student'
+            });
+
+          if (roleError) {
+            console.error('Error assigning role:', roleError);
+          }
+        }
+
       } catch (error) {
         console.error('Error initializing user data:', error);
       }

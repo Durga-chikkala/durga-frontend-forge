@@ -78,9 +78,42 @@ export const useDiscussionPosts = () => {
     }
   }, []);
 
+  const createPost = useCallback(async (title: string, content: string, category: string = 'general') => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from('discussion_posts')
+        .insert({
+          title,
+          content,
+          category,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating post:', error);
+        return false;
+      }
+
+      console.log('Post created successfully:', data);
+      fetchPosts(); // Refresh posts
+      return true;
+    } catch (error) {
+      console.error('Error in createPost:', error);
+      return false;
+    }
+  }, [fetchPosts]);
+
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
 
-  return { posts, loading, refetch: fetchPosts };
+  return { posts, loading, refetch: fetchPosts, createPost };
 };

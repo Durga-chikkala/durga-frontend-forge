@@ -47,10 +47,16 @@ export const useLeaderboard = () => {
         // Fetch additional data for each profile
         const leaderboardData = await Promise.all(
           profiles.map(async (profile) => {
-            // Get user progress
+            // Get user progress - sum all points for the user
             const { data: progressData } = await supabase
               .from('user_progress')
               .select('total_points, study_streak')
+              .eq('user_id', profile.id);
+
+            // Get user activities total points
+            const { data: activitiesData } = await supabase
+              .from('user_activities')
+              .select('points_earned')
               .eq('user_id', profile.id);
 
             // Get achievements count
@@ -66,7 +72,10 @@ export const useLeaderboard = () => {
               .eq('user_id', profile.id);
 
             // Calculate totals
-            const totalPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
+            const progressPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
+            const activityPoints = activitiesData?.reduce((sum, a) => sum + (a.points_earned || 0), 0) || 0;
+            const totalPoints = progressPoints + activityPoints;
+            
             const maxStreak = Math.max(...(progressData?.map(p => p.study_streak || 0) || [0]), 0);
 
             const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
@@ -104,6 +113,8 @@ export const useLeaderboard = () => {
 
     if (user) {
       fetchLeaderboard();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 

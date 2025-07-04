@@ -31,14 +31,45 @@ export const useDiscussionPosts = () => {
         .from('discussion_posts')
         .select(`
           *,
-          profiles!discussion_posts_user_id_fkey(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) {
         console.error('Error fetching posts:', error);
-        setPosts([]);
+        // Fallback: try without inner join
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('discussion_posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (fallbackError) {
+          console.error('Fallback fetch also failed:', fallbackError);
+          setPosts([]);
+          return;
+        }
+
+        // Process fallback data and try to get user info separately
+        const processedFallbackPosts = await Promise.all(
+          (fallbackData || []).map(async (post) => {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', post.user_id)
+              .single();
+
+            return {
+              ...post,
+              profiles: profile,
+              display_name: profile?.full_name || profile?.email?.split('@')[0] || 'Anonymous User'
+            };
+          })
+        );
+
+        console.log('Processed fallback posts:', processedFallbackPosts);
+        setPosts(processedFallbackPosts);
         return;
       }
 

@@ -25,6 +25,7 @@ export const useDiscussionPosts = () => {
   const fetchPosts = useCallback(async () => {
     try {
       console.log('Fetching discussion posts...');
+      setLoading(true);
       
       const { data, error } = await supabase
         .from('discussion_posts')
@@ -38,14 +39,19 @@ export const useDiscussionPosts = () => {
       if (error) {
         console.error('Error fetching posts:', error);
         setPosts([]);
-        setLoading(false);
         return;
       }
 
       console.log('Raw posts data:', data);
 
+      if (!data || data.length === 0) {
+        console.log('No posts found');
+        setPosts([]);
+        return;
+      }
+
       // Process posts to ensure proper display names
-      const processedPosts = (data || []).map(post => {
+      const processedPosts = data.map(post => {
         let displayName = 'Anonymous User';
         
         if (post.profiles) {

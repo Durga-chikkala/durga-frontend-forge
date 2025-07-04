@@ -23,79 +23,77 @@ export const useLeaderboard = () => {
     const fetchLeaderboard = async () => {
       try {
         console.log('Fetching leaderboard data...');
+        setLoading(true);
         
-        // Get all profiles with their progress data
-        const { data: leaderboardData, error: leaderboardError } = await supabase
+        // Get all profiles
+        const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select(`
-            id,
-            full_name,
-            email,
-            user_progress!user_progress_user_id_fkey (
-              total_points,
-              study_streak
-            ),
-            user_achievements!user_achievements_user_id_fkey (
-              id
-            ),
-            discussion_posts!discussion_posts_user_id_fkey (
-              id
-            )
-          `);
+          .select('id, full_name, email');
 
-        if (leaderboardError) {
-          console.error('Error fetching leaderboard:', leaderboardError);
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
           setLeaderboard([]);
-          setLoading(false);
           return;
         }
 
-        console.log('Raw leaderboard data:', leaderboardData);
+        console.log('Profiles found:', profiles);
 
-        if (!leaderboardData || leaderboardData.length === 0) {
+        if (!profiles || profiles.length === 0) {
           console.log('No profiles found');
           setLeaderboard([]);
-          setLoading(false);
           return;
         }
 
-        // Process the data to create leaderboard entries
-        const processedData = leaderboardData.map(profile => {
-          // Calculate total points from all progress entries
-          const progressEntries = profile.user_progress || [];
-          const totalPoints = progressEntries.reduce((sum: number, p: any) => sum + (p.total_points || 0), 0);
-          
-          // Get maximum study streak
-          const maxStreak = Math.max(...progressEntries.map((p: any) => p.study_streak || 0), 0);
-          
-          // Count achievements and posts
-          const achievementCount = (profile.user_achievements || []).length;
-          const postCount = (profile.discussion_posts || []).length;
+        // Fetch additional data for each profile
+        const leaderboardData = await Promise.all(
+          profiles.map(async (profile) => {
+            // Get user progress
+            const { data: progressData } = await supabase
+              .from('user_progress')
+              .select('total_points, study_streak')
+              .eq('user_id', profile.id);
 
-          const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
+            // Get achievements count
+            const { count: achievementsCount } = await supabase
+              .from('user_achievements')
+              .select('id', { count: 'exact' })
+              .eq('user_id', profile.id);
 
-          return {
-            user_id: profile.id,
-            full_name: displayName,
-            total_points: totalPoints,
-            study_streak: maxStreak,
-            achievements_count: achievementCount,
-            posts_count: postCount,
-            rank: 0, // Will be set after sorting
-            isCurrentUser: profile.id === user?.id
-          };
-        });
+            // Get posts count
+            const { count: postsCount } = await supabase
+              .from('discussion_posts')
+              .select('id', { count: 'exact' })
+              .eq('user_id', profile.id);
+
+            // Calculate totals
+            const totalPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
+            const maxStreak = Math.max(...(progressData?.map(p => p.study_streak || 0) || [0]), 0);
+
+            const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
+
+            return {
+              user_id: profile.id,
+              full_name: displayName,
+              total_points: totalPoints,
+              study_streak: maxStreak,
+              achievements_count: achievementsCount || 0,
+              posts_count: postsCount || 0,
+              rank: 0, // Will be set after sorting
+              isCurrentUser: profile.id === user?.id
+            };
+          })
+        );
 
         // Sort by total points (descending)
-        processedData.sort((a, b) => b.total_points - a.total_points);
+        leaderboardData.sort((a, b) => b.total_points - a.total_points);
 
         // Assign ranks
-        processedData.forEach((entry, index) => {
+        leaderboardData.forEach((entry, index) => {
           entry.rank = index + 1;
         });
 
-        console.log('Final leaderboard data:', processedData);
-        setLeaderboard(processedData);
+        console.log('Final leaderboard data:', leaderboardData);
+        setLeaderboard(leaderboardData);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
         setLeaderboard([]);

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,6 +29,8 @@ const Admin = () => {
 
   const fetchStats = async () => {
     try {
+      console.log('Fetching admin stats...');
+      
       // Get real counts from database
       const [usersResult, materialsResult, questionsResult, sessionsResult] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -37,6 +38,13 @@ const Admin = () => {
         supabase.from('questions').select('*', { count: 'exact', head: true }),
         supabase.from('scheduled_sessions').select('*', { count: 'exact', head: true })
       ]);
+
+      console.log('Raw counts:', {
+        users: usersResult.count,
+        materials: materialsResult.count,
+        questions: questionsResult.count,
+        sessions: sessionsResult.count
+      });
 
       setStats({
         users: usersResult.count || 0,
@@ -46,6 +54,13 @@ const Admin = () => {
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Set to 0 if there's an error instead of keeping old values
+      setStats({
+        users: 0,
+        materials: 0,
+        questions: 0,
+        sessions: 0
+      });
     }
   };
 
@@ -78,7 +93,7 @@ const Admin = () => {
         <QuickStats stats={stats} />
 
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm">
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
             <TabsTrigger value="questions">Questions</TabsTrigger>

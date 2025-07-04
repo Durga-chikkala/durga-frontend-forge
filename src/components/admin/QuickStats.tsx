@@ -15,10 +15,9 @@ interface StatsProps {
 
 export const QuickStats = ({ stats }: StatsProps) => {
   const [engagementStats, setEngagementStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
     totalPosts: 0,
     totalAchievements: 0,
+    activeUsers: 0,
     engagementRate: 0
   });
 
@@ -26,17 +25,6 @@ export const QuickStats = ({ stats }: StatsProps) => {
     const fetchEngagementStats = async () => {
       try {
         console.log('Fetching engagement stats...');
-
-        // Get active users (users with recent activity in last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const { data: recentActivities } = await supabase
-          .from('user_activities')
-          .select('user_id')
-          .gte('created_at', thirtyDaysAgo.toISOString());
-
-        const activeUsers = new Set(recentActivities?.map(a => a.user_id) || []).size;
 
         // Get total posts
         const { count: totalPosts } = await supabase
@@ -48,33 +36,46 @@ export const QuickStats = ({ stats }: StatsProps) => {
           .from('user_achievements')
           .select('id', { count: 'exact' });
 
-        // Calculate engagement rate (active users / total users)
+        // Get active users (users with recent activity in last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const { data: recentActivities } = await supabase
+          .from('user_activities')
+          .select('user_id')
+          .gte('created_at', thirtyDaysAgo.toISOString());
+
+        const activeUsers = recentActivities ? new Set(recentActivities.map(a => a.user_id)).size : 0;
+
+        // Calculate engagement rate
         const engagementRate = stats.users > 0 ? Math.round((activeUsers / stats.users) * 100) : 0;
 
-        console.log('Engagement stats:', {
-          totalUsers: stats.users,
-          activeUsers,
+        console.log('Engagement stats calculated:', {
           totalPosts: totalPosts || 0,
           totalAchievements: totalAchievements || 0,
+          activeUsers,
           engagementRate
         });
 
         setEngagementStats({
-          totalUsers: stats.users,
-          activeUsers,
           totalPosts: totalPosts || 0,
           totalAchievements: totalAchievements || 0,
+          activeUsers,
           engagementRate
         });
       } catch (error) {
         console.error('Error fetching engagement stats:', error);
+        setEngagementStats({
+          totalPosts: 0,
+          totalAchievements: 0,
+          activeUsers: 0,
+          engagementRate: 0
+        });
       }
     };
 
-    if (stats.users > 0) {
-      fetchEngagementStats();
-    }
-  }, [stats]);
+    fetchEngagementStats();
+  }, [stats.users]);
 
   const statItems = [
     {
@@ -116,7 +117,7 @@ export const QuickStats = ({ stats }: StatsProps) => {
     },
     {
       title: 'Total Students',
-      value: engagementStats.totalUsers,
+      value: stats.users,
       activeValue: engagementStats.activeUsers,
       icon: Users,
       color: 'text-indigo-600',
@@ -161,7 +162,7 @@ export const QuickStats = ({ stats }: StatsProps) => {
                   <p className={`text-3xl font-bold ${item.color}`}>
                     {item.value}{item.suffix || ''}
                   </p>
-                  {item.activeValue && (
+                  {item.activeValue !== undefined && (
                     <p className="text-sm text-gray-600">
                       ({item.activeValue} active)
                     </p>

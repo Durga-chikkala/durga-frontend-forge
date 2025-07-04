@@ -21,6 +21,7 @@ export const DiscussionForum = () => {
   };
 
   const getInitials = (name: string) => {
+    if (!name || name === 'Anonymous User') return 'AU';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
@@ -68,7 +69,7 @@ export const DiscussionForum = () => {
             size="sm" 
             className="bg-green-600 hover:bg-green-700 text-white"
             onClick={() => {
-              // Refresh posts when user clicks new post
+              console.log('Refreshing discussion posts...');
               refetch();
             }}
           >

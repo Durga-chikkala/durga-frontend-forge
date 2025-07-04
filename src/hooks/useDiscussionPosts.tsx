@@ -31,45 +31,14 @@ export const useDiscussionPosts = () => {
         .from('discussion_posts')
         .select(`
           *,
-          profiles!inner(full_name, email)
+          profiles(full_name, email)
         `)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) {
         console.error('Error fetching posts:', error);
-        // Fallback: try without inner join
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('discussion_posts')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (fallbackError) {
-          console.error('Fallback fetch also failed:', fallbackError);
-          setPosts([]);
-          return;
-        }
-
-        // Process fallback data and try to get user info separately
-        const processedFallbackPosts = await Promise.all(
-          (fallbackData || []).map(async (post) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name, email')
-              .eq('id', post.user_id)
-              .single();
-
-            return {
-              ...post,
-              profiles: profile,
-              display_name: profile?.full_name || profile?.email?.split('@')[0] || 'Anonymous User'
-            };
-          })
-        );
-
-        console.log('Processed fallback posts:', processedFallbackPosts);
-        setPosts(processedFallbackPosts);
+        setPosts([]);
         return;
       }
 
@@ -142,9 +111,51 @@ export const useDiscussionPosts = () => {
     }
   }, [fetchPosts]);
 
+  const likePost = useCallback(async (postId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return false;
+      }
+
+      // Get current likes count
+      const { data: currentPost } = await supabase
+        .from('discussion_posts')
+        .select('likes_count')
+        .eq('id', postId)
+        .single();
+
+      if (!currentPost) {
+        console.error('Post not found');
+        return false;
+      }
+
+      // Update likes count
+      const { error } = await supabase
+        .from('discussion_posts')
+        .update({ 
+          likes_count: (currentPost.likes_count || 0) + 1
+        })
+        .eq('id', postId);
+
+      if (error) {
+        console.error('Error liking post:', error);
+        return false;
+      }
+
+      console.log('Post liked successfully');
+      fetchPosts(); // Refresh posts to show updated like count
+      return true;
+    } catch (error) {
+      console.error('Error in likePost:', error);
+      return false;
+    }
+  }, [fetchPosts]);
+
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
 
-  return { posts, loading, refetch: fetchPosts, createPost };
+  return { posts, loading, refetch: fetchPosts, createPost, likePost };
 };

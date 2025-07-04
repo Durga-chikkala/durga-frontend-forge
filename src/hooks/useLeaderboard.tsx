@@ -25,47 +25,24 @@ export const useLeaderboard = () => {
         console.log('Fetching leaderboard data...');
         setLoading(true);
         
-        // Get all profiles - try different approaches
-        let profiles = null;
-        
-        // First try: get profiles directly
-        const { data: profilesData, error: profilesError } = await supabase
+        // Get all profiles
+        const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, email');
 
         if (profilesError) {
           console.error('Error fetching profiles:', profilesError);
-          
-          // Fallback: get user IDs from user_progress and then their profiles
-          const { data: progressData } = await supabase
-            .from('user_progress')
-            .select('user_id');
-          
-          if (progressData && progressData.length > 0) {
-            const userIds = [...new Set(progressData.map(p => p.user_id))];
-            const profilePromises = userIds.map(async (userId) => {
-              const { data } = await supabase
-                .from('profiles')
-                .select('id, full_name, email')
-                .eq('id', userId)
-                .single();
-              return data;
-            });
-            
-            const profileResults = await Promise.all(profilePromises);
-            profiles = profileResults.filter(Boolean);
-          }
-        } else {
-          profiles = profilesData;
+          setLeaderboard([]);
+          return;
         }
-
-        console.log('Profiles found:', profiles);
 
         if (!profiles || profiles.length === 0) {
           console.log('No profiles found');
           setLeaderboard([]);
           return;
         }
+
+        console.log('Profiles found:', profiles);
 
         // Fetch additional data for each profile
         const leaderboardData = await Promise.all(

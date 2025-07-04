@@ -107,16 +107,24 @@ export const useDiscussionReplies = (postId: string) => {
       console.log('Reply created successfully:', data);
       
       // Update the replies count in the discussion post
-      const { error: updateError } = await supabase
+      const { data: currentPost } = await supabase
         .from('discussion_posts')
-        .update({ 
-          replies_count: supabase.raw('replies_count + 1'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', postId);
+        .select('replies_count')
+        .eq('id', postId)
+        .single();
 
-      if (updateError) {
-        console.error('Error updating replies count:', updateError);
+      if (currentPost) {
+        const { error: updateError } = await supabase
+          .from('discussion_posts')
+          .update({ 
+            replies_count: (currentPost.replies_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', postId);
+
+        if (updateError) {
+          console.error('Error updating replies count:', updateError);
+        }
       }
 
       // Refresh replies list
@@ -132,10 +140,22 @@ export const useDiscussionReplies = (postId: string) => {
     if (!user) return false;
 
     try {
+      // Get current likes count
+      const { data: currentReply } = await supabase
+        .from('discussion_replies')
+        .select('likes_count')
+        .eq('id', replyId)
+        .single();
+
+      if (!currentReply) {
+        console.error('Reply not found');
+        return false;
+      }
+
       const { error } = await supabase
         .from('discussion_replies')
         .update({ 
-          likes_count: supabase.raw('likes_count + 1')
+          likes_count: (currentReply.likes_count || 0) + 1
         })
         .eq('id', replyId);
 

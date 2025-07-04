@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,12 +28,6 @@ const Admin = () => {
     sessions: 0,
     users: 0
   });
-  const [adminStats, setAdminStats] = useState({
-    totalRevenue: 0,
-    activeSubscriptions: 0,
-    completionRate: 0,
-    supportTickets: 0
-  });
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -48,7 +41,6 @@ const Admin = () => {
     if (user) {
       checkAdminRole();
       fetchStats();
-      fetchAdminStats();
     }
   }, [user, navigate, authLoading]);
 
@@ -92,45 +84,27 @@ const Admin = () => {
 
   const fetchStats = async () => {
     try {
-      const [materialsRes, questionsRes, sessionsRes, usersRes] = await Promise.all([
+      console.log('Fetching admin overview stats...');
+      
+      const [materialsRes, questionsRes, sessionsRes, profilesRes] = await Promise.all([
         supabase.from('study_materials').select('id', { count: 'exact' }),
         supabase.from('questions').select('id', { count: 'exact' }),
         supabase.from('scheduled_sessions').select('id', { count: 'exact' }),
-        supabase.from('user_roles').select('id', { count: 'exact' })
+        supabase.from('profiles').select('id', { count: 'exact' })
       ]);
+
+      console.log('Admin stats results:', {
+        materials: materialsRes.count,
+        questions: questionsRes.count,
+        sessions: sessionsRes.count,
+        users: profilesRes.count
+      });
 
       setStats({
         materials: materialsRes.count || 0,
         questions: questionsRes.count || 0,
         sessions: sessionsRes.count || 0,
-        users: usersRes.count || 0
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  const fetchAdminStats = async () => {
-    try {
-      // Calculate completion rate
-      const { data: progressData } = await supabase
-        .from('user_progress')
-        .select('is_completed');
-      
-      const completedCount = progressData?.filter(p => p.is_completed).length || 0;
-      const totalCount = progressData?.length || 1;
-      const completionRate = Math.round((completedCount / totalCount) * 100);
-
-      // Get active users count
-      const { count: activeUsers } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact' });
-
-      setAdminStats({
-        totalRevenue: 12450, // Mock data
-        activeSubscriptions: activeUsers || 0,
-        completionRate,
-        supportTickets: 3 // Mock data
+        users: profilesRes.count || 0
       });
     } catch (error) {
       console.error('Error fetching admin stats:', error);
@@ -191,17 +165,17 @@ const Admin = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Enhanced Admin Overview Cards */}
+        {/* Real Data Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm font-medium">Total Revenue</p>
-                  <p className="text-3xl font-bold">${adminStats.totalRevenue.toLocaleString()}</p>
-                  <p className="text-green-200 text-xs mt-1">+12% from last month</p>
+                  <p className="text-green-100 text-sm font-medium">Study Materials</p>
+                  <p className="text-3xl font-bold">{stats.materials}</p>
+                  <p className="text-green-200 text-xs mt-1">Published content</p>
                 </div>
-                <BarChart3 className="w-8 h-8 text-green-200" />
+                <BookOpen className="w-8 h-8 text-green-200" />
               </div>
             </CardContent>
           </Card>
@@ -210,9 +184,9 @@ const Admin = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Active Students</p>
-                  <p className="text-3xl font-bold">{adminStats.activeSubscriptions}</p>
-                  <p className="text-blue-200 text-xs mt-1">Engaged learners</p>
+                  <p className="text-blue-100 text-sm font-medium">Total Students</p>
+                  <p className="text-3xl font-bold">{stats.users}</p>
+                  <p className="text-blue-200 text-xs mt-1">Registered users</p>
                 </div>
                 <Users className="w-8 h-8 text-blue-200" />
               </div>
@@ -223,11 +197,11 @@ const Admin = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm font-medium">Completion Rate</p>
-                  <p className="text-3xl font-bold">{adminStats.completionRate}%</p>
-                  <p className="text-purple-200 text-xs mt-1">Course completion</p>
+                  <p className="text-purple-100 text-sm font-medium">Questions Asked</p>
+                  <p className="text-3xl font-bold">{stats.questions}</p>
+                  <p className="text-purple-200 text-xs mt-1">Student inquiries</p>
                 </div>
-                <Zap className="w-8 h-8 text-purple-200" />
+                <MessageCircle className="w-8 h-8 text-purple-200" />
               </div>
             </CardContent>
           </Card>
@@ -236,11 +210,11 @@ const Admin = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium">Support Tickets</p>
-                  <p className="text-3xl font-bold">{adminStats.supportTickets}</p>
-                  <p className="text-orange-200 text-xs mt-1">Pending resolution</p>
+                  <p className="text-orange-100 text-sm font-medium">Scheduled Sessions</p>
+                  <p className="text-3xl font-bold">{stats.sessions}</p>
+                  <p className="text-orange-200 text-xs mt-1">Active sessions</p>
                 </div>
-                <Settings className="w-8 h-8 text-orange-200" />
+                <Calendar className="w-8 h-8 text-orange-200" />
               </div>
             </CardContent>
           </Card>

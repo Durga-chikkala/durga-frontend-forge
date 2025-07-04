@@ -24,45 +24,62 @@ export const useLeaderboard = () => {
       try {
         console.log('Fetching leaderboard data...');
         
-        // First, get all profiles to ensure we have user data
+        // Get all profiles
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, email');
 
         if (profilesError) {
           console.error('Error fetching profiles:', profilesError);
+          setLeaderboard([]);
+          setLoading(false);
           return;
         }
 
-        console.log('Profiles data:', profilesData);
+        console.log('Profiles found:', profilesData);
 
         if (!profilesData || profilesData.length === 0) {
           console.log('No profiles found');
           setLeaderboard([]);
+          setLoading(false);
           return;
         }
 
-        // Get user progress data
-        const { data: progressData } = await supabase
+        // Get all user progress data
+        const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
           .select('user_id, total_points, study_streak');
+
+        if (progressError) {
+          console.error('Error fetching progress:', progressError);
+        }
 
         console.log('Progress data:', progressData);
 
         // Get achievement counts
-        const { data: achievementData } = await supabase
+        const { data: achievementData, error: achievementError } = await supabase
           .from('user_achievements')
           .select('user_id');
 
+        if (achievementError) {
+          console.error('Error fetching achievements:', achievementError);
+        }
+
         // Get post counts
-        const { data: postData } = await supabase
+        const { data: postData, error: postError } = await supabase
           .from('discussion_posts')
           .select('user_id');
 
-        // Process the data to create leaderboard entries
+        if (postError) {
+          console.error('Error fetching posts:', postError);
+        }
+
+        // Create leaderboard entries for ALL profiles
         const leaderboardData = profilesData.map(profile => {
-          // Find progress data for this user
-          const userProgress = progressData?.find(p => p.user_id === profile.id);
+          // Aggregate progress data for this user (sum all points and get max streak)
+          const userProgressEntries = progressData?.filter(p => p.user_id === profile.id) || [];
+          const totalPoints = userProgressEntries.reduce((sum, p) => sum + (p.total_points || 0), 0);
+          const maxStreak = Math.max(...userProgressEntries.map(p => p.study_streak || 0), 0);
           
           // Count achievements for this user
           const achievementCount = achievementData?.filter(a => a.user_id === profile.id).length || 0;
@@ -70,11 +87,13 @@ export const useLeaderboard = () => {
           // Count posts for this user
           const postCount = postData?.filter(p => p.user_id === profile.id).length || 0;
 
+          const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
+
           return {
             user_id: profile.id,
-            full_name: profile.full_name || profile.email?.split('@')[0] || 'Unknown User',
-            total_points: userProgress?.total_points || 0,
-            study_streak: userProgress?.study_streak || 0,
+            full_name: displayName,
+            total_points: totalPoints,
+            study_streak: maxStreak,
             achievements_count: achievementCount,
             posts_count: postCount,
             rank: 0, // Will be set after sorting
@@ -91,17 +110,16 @@ export const useLeaderboard = () => {
         });
 
         console.log('Final leaderboard data:', leaderboardData);
-        setLeaderboard(leaderboardData.slice(0, 10));
+        setLeaderboard(leaderboardData);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
+        setLeaderboard([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) {
-      fetchLeaderboard();
-    }
+    fetchLeaderboard();
   }, [user]);
 
   return { leaderboard, loading };

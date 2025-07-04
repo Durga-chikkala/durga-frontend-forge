@@ -24,6 +24,8 @@ export const useDiscussionPosts = () => {
 
   const fetchPosts = useCallback(async () => {
     try {
+      console.log('Fetching discussion posts...');
+      
       const { data, error } = await supabase
         .from('discussion_posts')
         .select(`
@@ -33,16 +35,25 @@ export const useDiscussionPosts = () => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching posts:', error);
+        setPosts([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Raw posts data:', data);
 
       // Process posts to ensure proper display names
       const processedPosts = (data || []).map(post => {
         let displayName = 'Anonymous User';
         
-        if (post.profiles?.full_name) {
-          displayName = post.profiles.full_name;
-        } else if (post.profiles?.email) {
-          displayName = post.profiles.email.split('@')[0];
+        if (post.profiles) {
+          if (post.profiles.full_name) {
+            displayName = post.profiles.full_name;
+          } else if (post.profiles.email) {
+            displayName = post.profiles.email.split('@')[0];
+          }
         }
 
         return {
@@ -51,10 +62,11 @@ export const useDiscussionPosts = () => {
         };
       });
 
-      console.log('Discussion posts:', processedPosts);
+      console.log('Processed posts:', processedPosts);
       setPosts(processedPosts);
     } catch (error) {
-      console.error('Error fetching discussion posts:', error);
+      console.error('Error in fetchPosts:', error);
+      setPosts([]);
     } finally {
       setLoading(false);
     }

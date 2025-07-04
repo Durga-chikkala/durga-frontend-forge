@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Trophy, Medal, Award, TrendingUp, User, Crown } from 'lucide-react';
+import { Trophy, Medal, Award, TrendingUp, Crown } from 'lucide-react';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useState } from 'react';
 
@@ -48,6 +48,11 @@ export const InteractiveLeaderboard = () => {
     }
   };
 
+  const getInitials = (name: string) => {
+    if (!name || name === 'Unknown User') return 'U';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   if (loading) {
     return (
       <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-0 shadow-xl">
@@ -86,7 +91,7 @@ export const InteractiveLeaderboard = () => {
             Interactive Leaderboard
           </div>
           <Badge className="bg-purple-600 text-white">
-            Top {Math.min(sortedData.length, 10)}
+            {sortedData.length} Users
           </Badge>
         </CardTitle>
         
@@ -153,8 +158,12 @@ export const InteractiveLeaderboard = () => {
 
                   {/* Avatar */}
                   <Avatar className="w-10 h-10 border-2 border-white shadow-sm">
-                    <AvatarFallback>
-                      {entry.full_name.charAt(0)}
+                    <AvatarFallback className={`${
+                      entry.isCurrentUser 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {getInitials(entry.full_name)}
                     </AvatarFallback>
                   </Avatar>
 

@@ -35,81 +35,124 @@ export const useAdminStats = () => {
 
   const fetchAdminStats = useCallback(async () => {
     try {
-      // Get total users count
-      const { count: totalUsers } = await supabase
+      console.log('Fetching admin stats...');
+
+      // Get total users count from profiles table
+      const { count: totalUsers, error: usersError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Get active users (users with activity in last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      if (usersError) {
+        console.error('Error fetching total users:', usersError);
+      }
+
+      console.log('Total users:', totalUsers);
+
+      // Get active users (users with activity in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const { data: recentSessions } = await supabase
-        .from('user_study_sessions')
+      const { data: recentActivities, error: activitiesError } = await supabase
+        .from('user_activities')
         .select('user_id')
-        .gte('created_at', sevenDaysAgo.toISOString());
+        .gte('created_at', thirtyDaysAgo.toISOString());
 
-      const activeUsers = new Set(recentSessions?.map(s => s.user_id) || []).size;
+      if (activitiesError) {
+        console.error('Error fetching recent activities:', activitiesError);
+      }
 
-      // Get user progress data
-      const { data: progressData } = await supabase
+      const activeUsers = new Set(recentActivities?.map(a => a.user_id) || []).size;
+      console.log('Active users:', activeUsers);
+
+      // Get user progress data for completion rate and average score
+      const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
         .select('*');
 
+      if (progressError) {
+        console.error('Error fetching progress data:', progressError);
+      }
+
+      console.log('Progress data:', progressData);
+
       // Calculate completion rate (users who completed at least one week)
-      const usersWithProgress = new Set(progressData?.filter(p => p.is_completed).map(p => p.user_id) || []).size;
-      const completionRate = totalUsers && totalUsers > 0 ? (usersWithProgress / totalUsers) * 100 : 0;
+      const usersWithCompletedWeeks = new Set(
+        progressData?.filter(p => p.is_completed).map(p => p.user_id) || []
+      ).size;
+      const completionRate = totalUsers && totalUsers > 0 ? Math.round((usersWithCompletedWeeks / totalUsers) * 100) : 0;
 
       // Calculate average progress score
       const totalPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
-      const avgProgressScore = totalUsers && totalUsers > 0 ? totalPoints / totalUsers : 0;
+      const avgProgressScore = totalUsers && totalUsers > 0 ? Math.round(totalPoints / totalUsers) : 0;
 
-      // Get real top performers - deduplicated by user
-      const { data: topPerformersRaw } = await supabase
+      // Get top performers with actual names
+      const { data: topPerformersData, error: topPerformersError } = await supabase
         .from('user_progress')
         .select(`
           user_id,
           total_points,
           study_streak,
-          profiles!user_progress_user_id_fkey(full_name)
+          is_completed,
+          profiles!user_progress_user_id_fkey(full_name, email)
         `)
         .not('total_points', 'is', null)
         .order('total_points', { ascending: false });
 
-      // Deduplicate by user_id and get top 3
-      const userMap = new Map();
-      topPerformersRaw?.forEach(performer => {
+      if (topPerformersError) {
+        console.error('Error fetching top performers:', topPerformersError);
+      }
+
+      // Process top performers - deduplicate by user and get top 3
+      const userStatsMap = new Map();
+      topPerformersData?.forEach(performer => {
         const userId = performer.user_id;
-        const existing = userMap.get(userId);
-        if (!existing || (performer.total_points || 0) > (existing.total_points || 0)) {
-          userMap.set(userId, performer);
+        const existing = userStatsMap.get(userId);
+        
+        if (!existing || (performer.total_points || 0) > (existing.totalPoints || 0)) {
+          const profile = performer.profiles as any;
+          const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'Unknown User';
+          
+          userStatsMap.set(userId, {
+            id: userId,
+            name: displayName,
+            totalPoints: performer.total_points || 0,
+            streak: performer.study_streak || 0,
+            isCompleted: performer.is_completed || false
+          });
         }
       });
 
-      const topPerformers = Array.from(userMap.values())
+      const topPerformers = Array.from(userStatsMap.values())
+        .sort((a, b) => b.totalPoints - a.totalPoints)
         .slice(0, 3)
-        .map(p => ({
-          id: p.user_id,
-          name: (p.profiles as any)?.full_name || 'Anonymous User',
-          points: p.total_points || 0,
-          streak: p.study_streak || 0,
-          completedWeeks: progressData?.filter(prog => 
-            prog.user_id === p.user_id && prog.is_completed
+        .map(performer => ({
+          id: performer.id,
+          name: performer.name,
+          points: performer.totalPoints,
+          streak: performer.streak,
+          completedWeeks: progressData?.filter(p => 
+            p.user_id === performer.id && p.is_completed
           ).length || 0
         }));
 
-      // Get real weekly engagement data from user_study_sessions
+      console.log('Top performers:', topPerformers);
+
+      // Get weekly engagement data from user_activities
       const fourWeeksAgo = new Date();
       fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
 
-      const { data: sessionData } = await supabase
-        .from('user_study_sessions')
-        .select('created_at, user_id, completed')
+      const { data: activityData, error: weeklyError } = await supabase
+        .from('user_activities')
+        .select('created_at, user_id')
         .gte('created_at', fourWeeksAgo.toISOString())
         .order('created_at', { ascending: true });
 
-      // Group sessions by week
-      const weeklyData = [];
+      if (weeklyError) {
+        console.error('Error fetching weekly data:', weeklyError);
+      }
+
+      // Group activities by week
+      const weeklyEngagement = [];
       for (let i = 3; i >= 0; i--) {
         const weekStart = new Date();
         weekStart.setDate(weekStart.getDate() - (i * 7 + 6));
@@ -119,29 +162,36 @@ export const useAdminStats = () => {
         weekEnd.setDate(weekEnd.getDate() - (i * 7));
         weekEnd.setHours(23, 59, 59, 999);
 
-        const weekSessions = sessionData?.filter(session => {
-          const sessionDate = new Date(session.created_at);
-          return sessionDate >= weekStart && sessionDate <= weekEnd;
+        const weekActivities = activityData?.filter(activity => {
+          const activityDate = new Date(activity.created_at);
+          return activityDate >= weekStart && activityDate <= weekEnd;
         }) || [];
 
-        const uniqueUsers = new Set(weekSessions.map(s => s.user_id)).size;
-        const completedSessions = weekSessions.filter(s => s.completed).length;
-        const completionRate = weekSessions.length > 0 ? Math.round((completedSessions / weekSessions.length) * 100) : 0;
+        const uniqueUsers = new Set(weekActivities.map(a => a.user_id)).size;
+        
+        // Get completion data for this week
+        const weekCompletions = progressData?.filter(p => {
+          if (!p.completed_at) return false;
+          const completedDate = new Date(p.completed_at);
+          return completedDate >= weekStart && completedDate <= weekEnd;
+        }).length || 0;
 
-        weeklyData.push({
+        weeklyEngagement.push({
           week: `Week ${4 - i}`,
           users: uniqueUsers,
-          sessions: weekSessions.length,
-          completion: Math.min(completionRate, 100) // Cap at 100%
+          sessions: weekActivities.length,
+          completion: Math.min(weekCompletions * 10, 100) // Scale completion for visualization
         });
       }
+
+      console.log('Weekly engagement:', weeklyEngagement);
 
       setStats({
         totalUsers: totalUsers || 0,
         activeUsers,
-        completionRate: Math.round(completionRate),
-        avgProgressScore: Math.round(avgProgressScore),
-        weeklyEngagement: weeklyData,
+        completionRate,
+        avgProgressScore,
+        weeklyEngagement,
         topPerformers
       });
 

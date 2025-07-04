@@ -19,27 +19,24 @@ export const QuickStats = ({ stats }: StatsProps) => {
     activeUsers: 0,
     totalPosts: 0,
     totalAchievements: 0,
-    growthRate: 0
+    engagementRate: 0
   });
 
   useEffect(() => {
     const fetchEngagementStats = async () => {
       try {
-        // Get total users
-        const { count: totalUsers } = await supabase
-          .from('profiles')
-          .select('id', { count: 'exact' });
+        console.log('Fetching engagement stats...');
 
-        // Get active users (users with recent activity)
+        // Get active users (users with recent activity in last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const { data: recentSessions } = await supabase
-          .from('user_study_sessions')
+        const { data: recentActivities } = await supabase
+          .from('user_activities')
           .select('user_id')
           .gte('created_at', thirtyDaysAgo.toISOString());
 
-        const activeUsers = new Set(recentSessions?.map(s => s.user_id) || []).size;
+        const activeUsers = new Set(recentActivities?.map(a => a.user_id) || []).size;
 
         // Get total posts
         const { count: totalPosts } = await supabase
@@ -52,22 +49,32 @@ export const QuickStats = ({ stats }: StatsProps) => {
           .select('id', { count: 'exact' });
 
         // Calculate engagement rate (active users / total users)
-        const engagementRate = totalUsers && totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0;
+        const engagementRate = stats.users > 0 ? Math.round((activeUsers / stats.users) * 100) : 0;
 
-        setEngagementStats({
-          totalUsers: totalUsers || 0,
-          activeUsers: activeUsers || 0,
+        console.log('Engagement stats:', {
+          totalUsers: stats.users,
+          activeUsers,
           totalPosts: totalPosts || 0,
           totalAchievements: totalAchievements || 0,
-          growthRate: engagementRate
+          engagementRate
+        });
+
+        setEngagementStats({
+          totalUsers: stats.users,
+          activeUsers,
+          totalPosts: totalPosts || 0,
+          totalAchievements: totalAchievements || 0,
+          engagementRate
         });
       } catch (error) {
         console.error('Error fetching engagement stats:', error);
       }
     };
 
-    fetchEngagementStats();
-  }, []);
+    if (stats.users > 0) {
+      fetchEngagementStats();
+    }
+  }, [stats]);
 
   const statItems = [
     {
@@ -99,7 +106,7 @@ export const QuickStats = ({ stats }: StatsProps) => {
     },
     {
       title: 'Engagement Rate',
-      value: engagementStats.growthRate,
+      value: engagementStats.engagementRate,
       suffix: '%',
       icon: TrendingUp,
       color: 'text-orange-600',

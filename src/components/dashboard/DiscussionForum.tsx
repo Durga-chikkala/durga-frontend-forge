@@ -3,17 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { MessageSquare, Heart, Clock, Plus, TrendingUp, Send } from 'lucide-react';
+import { MessageSquare, Heart, Clock, Plus, TrendingUp, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDiscussionPosts } from '@/hooks/useDiscussionPosts';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DiscussionReplies } from './DiscussionReplies';
 
 export const DiscussionForum = () => {
-  const { posts, loading, refetch, createPost } = useDiscussionPosts();
+  const { posts, loading, refetch, createPost, likePost } = useDiscussionPosts();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
@@ -49,6 +51,20 @@ export const DiscussionForum = () => {
       setShowCreateForm(false);
     }
     setIsSubmitting(false);
+  };
+
+  const togglePostExpansion = (postId: string) => {
+    const newExpanded = new Set(expandedPosts);
+    if (newExpanded.has(postId)) {
+      newExpanded.delete(postId);
+    } else {
+      newExpanded.add(postId);
+    }
+    setExpandedPosts(newExpanded);
+  };
+
+  const handleLikePost = async (postId: string) => {
+    await likePost(postId);
   };
 
   if (loading) {
@@ -178,61 +194,84 @@ export const DiscussionForum = () => {
               </Button>
             </div>
           ) : (
-            posts.map((post) => (
-              <div
-                key={post.id}
-                className="p-4 rounded-lg border border-gray-200 hover:border-green-300 transition-all duration-200 cursor-pointer hover:shadow-md bg-white"
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10 border-2 border-green-100">
-                    <AvatarFallback className="bg-green-100 text-green-700 text-sm font-semibold">
-                      {getInitials(post.display_name || 'Anonymous User')}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-gray-900 truncate">{post.title || 'Untitled'}</h4>
-                      <Badge className={`text-xs px-2 py-1 ${getCategoryColor(post.category || 'general')}`}>
-                        {post.category || 'general'}
-                      </Badge>
-                    </div>
+            posts.map((post) => {
+              const isExpanded = expandedPosts.has(post.id);
+              return (
+                <div
+                  key={post.id}
+                  className="p-4 rounded-lg border border-gray-200 hover:border-green-300 transition-all duration-200 bg-white"
+                >
+                  <div className="flex items-start gap-3">
+                    <Avatar className="w-10 h-10 border-2 border-green-100">
+                      <AvatarFallback className="bg-green-100 text-green-700 text-sm font-semibold">
+                        {getInitials(post.display_name || 'Anonymous User')}
+                      </AvatarFallback>
+                    </Avatar>
                     
-                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                      {post.content || 'No content available'}
-                    </p>
-                    
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-green-600">
-                          {post.display_name || 'Anonymous User'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span>
-                            {post.created_at 
-                              ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
-                              : 'Unknown time'
-                            }
-                          </span>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-gray-900 truncate">{post.title || 'Untitled'}</h4>
+                        <Badge className={`text-xs px-2 py-1 ${getCategoryColor(post.category || 'general')}`}>
+                          {post.category || 'general'}
+                        </Badge>
                       </div>
                       
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <Heart className="w-3 h-3" />
-                          <span>{post.likes_count || 0}</span>
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                        {post.content || 'No content available'}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-green-600">
+                            {post.display_name || 'Anonymous User'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {post.created_at 
+                                ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
+                                : 'Unknown time'
+                              }
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" />
-                          <span>{post.replies_count || 0}</span>
+                        
+                        <div className="flex items-center gap-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleLikePost(post.id)}
+                            className="h-6 px-2 text-xs hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Heart className="w-3 h-3 mr-1" />
+                            <span>{post.likes_count || 0}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePostExpansion(post.id)}
+                            className="h-6 px-2 text-xs hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <MessageSquare className="w-3 h-3 mr-1" />
+                            <span>{post.replies_count || 0}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3 h-3 ml-1" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            )}
+                          </Button>
                         </div>
                       </div>
+
+                      <DiscussionReplies 
+                        postId={post.id} 
+                        isExpanded={isExpanded}
+                      />
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </CardContent>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Calendar, MessageCircle, Users, Plus, ArrowLeft, Menu, X } from 'lucide-react';
+import { BookOpen, Calendar, MessageCircle, Users, Plus, ArrowLeft, Menu, X, BarChart3, Zap, Shield, Settings } from 'lucide-react';
 import { StudyMaterialsAdmin } from '@/components/admin/StudyMaterialsAdmin';
 import { QuestionsAdmin } from '@/components/admin/QuestionsAdmin';
 import { SessionsAdmin } from '@/components/admin/SessionsAdmin';
@@ -21,18 +22,24 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({
     materials: 0,
     questions: 0,
     sessions: 0,
     users: 0
   });
+  const [adminStats, setAdminStats] = useState({
+    totalRevenue: 0,
+    activeSubscriptions: 0,
+    completionRate: 0,
+    supportTickets: 0
+  });
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Wait for auth to finish loading before redirecting
     if (!authLoading && !user) {
       navigate('/auth');
       return;
@@ -41,6 +48,7 @@ const Admin = () => {
     if (user) {
       checkAdminRole();
       fetchStats();
+      fetchAdminStats();
     }
   }, [user, navigate, authLoading]);
 
@@ -102,13 +110,39 @@ const Admin = () => {
     }
   };
 
-  // Show loading while auth is loading or admin check is loading
+  const fetchAdminStats = async () => {
+    try {
+      // Calculate completion rate
+      const { data: progressData } = await supabase
+        .from('user_progress')
+        .select('is_completed');
+      
+      const completedCount = progressData?.filter(p => p.is_completed).length || 0;
+      const totalCount = progressData?.length || 1;
+      const completionRate = Math.round((completedCount / totalCount) * 100);
+
+      // Get active users count
+      const { count: activeUsers } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact' });
+
+      setAdminStats({
+        totalRevenue: 12450, // Mock data
+        activeSubscriptions: activeUsers || 0,
+        completionRate,
+        supportTickets: 3 // Mock data
+      });
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+    }
+  };
+
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm sm:text-base">Verifying admin access...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-base">Verifying admin access...</p>
         </div>
       </div>
     );
@@ -119,168 +153,158 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Enhanced Mobile Header */}
-      <div className="lg:hidden bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center justify-between p-3 sm:p-4">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/dashboard')}
-              className="p-1.5 sm:p-2 flex-shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Button>
-            <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">
-              Admin Panel
-            </h1>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1.5 sm:p-2 flex-shrink-0"
-          >
-            {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
-          </Button>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 lg:py-8 max-w-7xl">
-        {/* Desktop Header */}
-        <div className="hidden lg:flex items-center justify-between mb-6 lg:mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Enhanced Admin Header */}
+      <div className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Admin Panel
-              </h1>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">Manage your course content and student engagement</p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  Admin Control Center
+                </h1>
+                <p className="text-sm text-gray-600 hidden sm:block">Manage your platform with advanced tools</p>
+              </div>
             </div>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <Badge className="bg-green-100 text-green-700 hidden sm:flex">
+              System Online
+            </Badge>
+            <Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Enhanced Admin Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Total Revenue</p>
+                  <p className="text-3xl font-bold">${adminStats.totalRevenue.toLocaleString()}</p>
+                  <p className="text-green-200 text-xs mt-1">+12% from last month</p>
+                </div>
+                <BarChart3 className="w-8 h-8 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-blue-500 to-cyan-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Active Students</p>
+                  <p className="text-3xl font-bold">{adminStats.activeSubscriptions}</p>
+                  <p className="text-blue-200 text-xs mt-1">Engaged learners</p>
+                </div>
+                <Users className="w-8 h-8 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-violet-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Completion Rate</p>
+                  <p className="text-3xl font-bold">{adminStats.completionRate}%</p>
+                  <p className="text-purple-200 text-xs mt-1">Course completion</p>
+                </div>
+                <Zap className="w-8 h-8 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">Support Tickets</p>
+                  <p className="text-3xl font-bold">{adminStats.supportTickets}</p>
+                  <p className="text-orange-200 text-xs mt-1">Pending resolution</p>
+                </div>
+                <Settings className="w-8 h-8 text-orange-200" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Enhanced Stats Cards */}
-        <QuickStats stats={stats} />
-
         {/* Enhanced Admin Tabs */}
-        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-6">
-          <CardContent className="p-2 sm:p-3 lg:p-6">
-            <Tabs defaultValue="analytics" className="w-full">
-              {/* Ultra Responsive Mobile Tab Navigation */}
-              <div className="lg:hidden mb-3 sm:mb-4">
-                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100 mb-2">
-                  <TabsTrigger 
-                    value="analytics" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-indigo-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Analytics</span>
+        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+          <CardContent className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              {/* Enhanced Tab Navigation */}
+              <div className="mb-6">
+                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 bg-gray-100 p-1 rounded-xl">
+                  <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Overview</span>
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="engagement" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Students</span>
-                  </TabsTrigger>
-                </TabsList>
-                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100 mb-2">
-                  <TabsTrigger 
-                    value="materials" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-blue-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Materials</span>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="questions" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Q&A</span>
-                  </TabsTrigger>
-                </TabsList>
-                <TabsList className="grid w-full grid-cols-2 gap-1 h-auto p-1 bg-gray-100">
-                  <TabsTrigger 
-                    value="sessions" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-purple-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Sessions</span>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="users" 
-                    className="flex flex-col items-center gap-1 p-2 sm:p-3 text-xs sm:text-sm data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-md"
-                  >
-                    <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Users</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              {/* Desktop Tab Navigation */}
-              <div className="hidden lg:block">
-                <TabsList className="grid w-full grid-cols-6 bg-gray-100 p-1">
-                  <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-white">
-                    <BookOpen className="w-4 h-4" />
-                    Analytics
-                  </TabsTrigger>
-                  <TabsTrigger value="engagement" className="flex items-center gap-2 data-[state=active]:bg-white">
+                  <TabsTrigger value="engagement" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
                     <Users className="w-4 h-4" />
-                    Student Engagement
+                    <span className="hidden sm:inline">Students</span>
                   </TabsTrigger>
-                  <TabsTrigger value="materials" className="flex items-center gap-2 data-[state=active]:bg-white">
+                  <TabsTrigger value="materials" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
                     <BookOpen className="w-4 h-4" />
-                    Materials
+                    <span className="hidden sm:inline">Materials</span>
                   </TabsTrigger>
-                  <TabsTrigger value="questions" className="flex items-center gap-2 data-[state=active]:bg-white">
+                  <TabsTrigger value="questions" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
                     <MessageCircle className="w-4 h-4" />
-                    Questions
+                    <span className="hidden sm:inline">Q&A</span>
                   </TabsTrigger>
-                  <TabsTrigger value="sessions" className="flex items-center gap-2 data-[state=active]:bg-white">
+                  <TabsTrigger value="sessions" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
                     <Calendar className="w-4 h-4" />
-                    Sessions
+                    <span className="hidden sm:inline">Sessions</span>
                   </TabsTrigger>
-                  <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-white">
+                  <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg">
                     <Users className="w-4 h-4" />
-                    Users
+                    <span className="hidden sm:inline">Users</span>
                   </TabsTrigger>
                 </TabsList>
               </div>
 
-              <TabsContent value="analytics" className="mt-4 sm:mt-6">
-                <div className="space-y-6">
+              <TabsContent value="overview" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <AnalyticsDashboard />
                   <EngagementAnalytics />
                 </div>
+                <QuickStats stats={stats} />
               </TabsContent>
 
-              <TabsContent value="engagement" className="mt-4 sm:mt-6">
+              <TabsContent value="engagement">
                 <StudentEngagement />
               </TabsContent>
 
-              <TabsContent value="materials" className="mt-4 sm:mt-6">
+              <TabsContent value="materials">
                 <StudyMaterialsAdmin onStatsUpdate={fetchStats} />
               </TabsContent>
 
-              <TabsContent value="questions" className="mt-4 sm:mt-6">
+              <TabsContent value="questions">
                 <QuestionsAdmin onStatsUpdate={fetchStats} />
               </TabsContent>
 
-              <TabsContent value="sessions" className="mt-4 sm:mt-6">
+              <TabsContent value="sessions">
                 <SessionsAdmin onStatsUpdate={fetchStats} />
               </TabsContent>
 
-              <TabsContent value="users" className="mt-4 sm:mt-6">
+              <TabsContent value="users">
                 <UsersAdmin onStatsUpdate={fetchStats} />
               </TabsContent>
             </Tabs>

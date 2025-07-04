@@ -94,7 +94,7 @@ export const AdvancedProgressTracker = () => {
             <div className="flex items-center justify-center mb-2">
               <Trophy className="w-5 h-5 text-yellow-600" />
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.total_points || 0}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalPoints || 0}</div>
             <div className="text-xs text-gray-600">Total Points</div>
           </div>
           
@@ -102,7 +102,7 @@ export const AdvancedProgressTracker = () => {
             <div className="flex items-center justify-center mb-2">
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.study_streak || 0}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.studyStreak || 0}</div>
             <div className="text-xs text-gray-600">Day Streak</div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,80 +22,75 @@ export const useLeaderboard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Get all user progress data with profile information
-        const { data: progressData, error: progressError } = await supabase
-          .from('user_progress')
-          .select(`
-            user_id,
-            total_points,
-            study_streak,
-            profiles!user_progress_user_id_fkey(full_name, email)
-          `)
-          .not('total_points', 'is', null)
-          .order('total_points', { ascending: false });
+        console.log('Fetching leaderboard data...');
+        
+        // First, get all profiles to ensure we have user data
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email');
 
-        if (progressError) {
-          console.error('Error fetching progress data:', progressError);
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
           return;
         }
 
-        // Create a map to deduplicate by user_id and keep highest points
-        const userMap = new Map();
-        progressData?.forEach(entry => {
-          const userId = entry.user_id;
-          const existing = userMap.get(userId);
-          if (!existing || (entry.total_points || 0) > (existing.total_points || 0)) {
-            userMap.set(userId, entry);
-          }
-        });
+        console.log('Profiles data:', profilesData);
 
-        const uniqueProgressData = Array.from(userMap.values());
+        if (!profilesData || profilesData.length === 0) {
+          console.log('No profiles found');
+          setLeaderboard([]);
+          return;
+        }
 
-        // Get achievement counts per user
+        // Get user progress data
+        const { data: progressData } = await supabase
+          .from('user_progress')
+          .select('user_id, total_points, study_streak');
+
+        console.log('Progress data:', progressData);
+
+        // Get achievement counts
         const { data: achievementData } = await supabase
           .from('user_achievements')
           .select('user_id');
 
-        // Get post counts per user
+        // Get post counts
         const { data: postData } = await supabase
           .from('discussion_posts')
           .select('user_id');
 
-        const achievementCounts = achievementData?.reduce((acc, curr) => {
-          acc[curr.user_id] = (acc[curr.user_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
-
-        const postCounts = postData?.reduce((acc, curr) => {
-          acc[curr.user_id] = (acc[curr.user_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
-
-        // Build leaderboard with proper fallback names
-        const leaderboardData = uniqueProgressData.map((entry, index) => {
-          let displayName = 'Unknown User';
+        // Process the data to create leaderboard entries
+        const leaderboardData = profilesData.map(profile => {
+          // Find progress data for this user
+          const userProgress = progressData?.find(p => p.user_id === profile.id);
           
-          // Try to get name from profiles
-          if (entry.profiles?.full_name) {
-            displayName = entry.profiles.full_name;
-          } else if (entry.profiles?.email) {
-            // Fallback to email if no full name
-            displayName = entry.profiles.email.split('@')[0];
-          }
+          // Count achievements for this user
+          const achievementCount = achievementData?.filter(a => a.user_id === profile.id).length || 0;
+          
+          // Count posts for this user
+          const postCount = postData?.filter(p => p.user_id === profile.id).length || 0;
 
           return {
-            user_id: entry.user_id,
-            full_name: displayName,
-            total_points: entry.total_points || 0,
-            study_streak: entry.study_streak || 0,
-            achievements_count: achievementCounts[entry.user_id] || 0,
-            posts_count: postCounts[entry.user_id] || 0,
-            rank: index + 1,
-            isCurrentUser: entry.user_id === user?.id
+            user_id: profile.id,
+            full_name: profile.full_name || profile.email?.split('@')[0] || 'Unknown User',
+            total_points: userProgress?.total_points || 0,
+            study_streak: userProgress?.study_streak || 0,
+            achievements_count: achievementCount,
+            posts_count: postCount,
+            rank: 0, // Will be set after sorting
+            isCurrentUser: profile.id === user?.id
           };
         });
 
-        console.log('Leaderboard data:', leaderboardData);
+        // Sort by total points (descending)
+        leaderboardData.sort((a, b) => b.total_points - a.total_points);
+
+        // Assign ranks
+        leaderboardData.forEach((entry, index) => {
+          entry.rank = index + 1;
+        });
+
+        console.log('Final leaderboard data:', leaderboardData);
         setLeaderboard(leaderboardData.slice(0, 10));
       } catch (error) {
         console.error('Error fetching leaderboard:', error);

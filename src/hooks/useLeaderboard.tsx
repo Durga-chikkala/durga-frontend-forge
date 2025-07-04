@@ -21,19 +21,24 @@ export const useLeaderboard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Get user progress with points - deduplicated by user
-        const { data: progressData } = await supabase
+        // Get all user progress data with profile information
+        const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
           .select(`
             user_id,
             total_points,
             study_streak,
-            profiles!user_progress_user_id_fkey(full_name)
+            profiles!user_progress_user_id_fkey(full_name, email)
           `)
           .not('total_points', 'is', null)
           .order('total_points', { ascending: false });
 
-        // Deduplicate by user_id and keep highest points
+        if (progressError) {
+          console.error('Error fetching progress data:', progressError);
+          return;
+        }
+
+        // Create a map to deduplicate by user_id and keep highest points
         const userMap = new Map();
         progressData?.forEach(entry => {
           const userId = entry.user_id;
@@ -65,17 +70,31 @@ export const useLeaderboard = () => {
           return acc;
         }, {} as Record<string, number>) || {};
 
-        const leaderboardData = uniqueProgressData.map((entry, index) => ({
-          user_id: entry.user_id,
-          full_name: entry.profiles?.full_name || 'Unknown User',
-          total_points: entry.total_points || 0,
-          study_streak: entry.study_streak || 0,
-          achievements_count: achievementCounts[entry.user_id] || 0,
-          posts_count: postCounts[entry.user_id] || 0,
-          rank: index + 1,
-          isCurrentUser: entry.user_id === user?.id
-        }));
+        // Build leaderboard with proper fallback names
+        const leaderboardData = uniqueProgressData.map((entry, index) => {
+          let displayName = 'Unknown User';
+          
+          // Try to get name from profiles
+          if (entry.profiles?.full_name) {
+            displayName = entry.profiles.full_name;
+          } else if (entry.profiles?.email) {
+            // Fallback to email if no full name
+            displayName = entry.profiles.email.split('@')[0];
+          }
 
+          return {
+            user_id: entry.user_id,
+            full_name: displayName,
+            total_points: entry.total_points || 0,
+            study_streak: entry.study_streak || 0,
+            achievements_count: achievementCounts[entry.user_id] || 0,
+            posts_count: postCounts[entry.user_id] || 0,
+            rank: index + 1,
+            isCurrentUser: entry.user_id === user?.id
+          };
+        });
+
+        console.log('Leaderboard data:', leaderboardData);
         setLeaderboard(leaderboardData.slice(0, 10));
       } catch (error) {
         console.error('Error fetching leaderboard:', error);

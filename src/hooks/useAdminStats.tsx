@@ -85,59 +85,52 @@ export const useAdminStats = () => {
       const totalPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
       const avgProgressScore = totalUsers && totalUsers > 0 ? Math.round(totalPoints / totalUsers) : 0;
 
-      // Get top performers with actual names
+      // Get top performers with actual names using join
       const { data: topPerformersData, error: topPerformersError } = await supabase
-        .from('user_progress')
+        .from('profiles')
         .select(`
-          user_id,
-          total_points,
-          study_streak,
-          is_completed,
-          profiles!user_progress_user_id_fkey(full_name, email)
+          id,
+          full_name,
+          email,
+          user_progress!user_progress_user_id_fkey (
+            total_points,
+            study_streak,
+            is_completed
+          )
         `)
-        .not('total_points', 'is', null)
-        .order('total_points', { ascending: false });
+        .not('user_progress.total_points', 'is', null)
+        .order('user_progress.total_points', { ascending: false })
+        .limit(10);
 
       if (topPerformersError) {
         console.error('Error fetching top performers:', topPerformersError);
       }
 
-      // Process top performers - deduplicate by user and get top 3
-      const userStatsMap = new Map();
-      topPerformersData?.forEach(performer => {
-        const userId = performer.user_id;
-        const existing = userStatsMap.get(userId);
-        
-        if (!existing || (performer.total_points || 0) > (existing.totalPoints || 0)) {
-          const profile = performer.profiles as any;
-          const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'Unknown User';
-          
-          userStatsMap.set(userId, {
-            id: userId,
-            name: displayName,
-            totalPoints: performer.total_points || 0,
-            streak: performer.study_streak || 0,
-            isCompleted: performer.is_completed || false
-          });
-        }
-      });
+      // Process top performers data
+      const topPerformers = (topPerformersData || [])
+        .map(profile => {
+          const progressEntries = profile.user_progress || [];
+          const totalPoints = progressEntries.reduce((sum: number, p: any) => sum + (p.total_points || 0), 0);
+          const maxStreak = Math.max(...progressEntries.map((p: any) => p.study_streak || 0), 0);
+          const completedWeeks = progressEntries.filter((p: any) => p.is_completed).length;
 
-      const topPerformers = Array.from(userStatsMap.values())
-        .sort((a, b) => b.totalPoints - a.totalPoints)
-        .slice(0, 3)
-        .map(performer => ({
-          id: performer.id,
-          name: performer.name,
-          points: performer.totalPoints,
-          streak: performer.streak,
-          completedWeeks: progressData?.filter(p => 
-            p.user_id === performer.id && p.is_completed
-          ).length || 0
-        }));
+          const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
+
+          return {
+            id: profile.id,
+            name: displayName,
+            points: totalPoints,
+            streak: maxStreak,
+            completedWeeks
+          };
+        })
+        .filter(performer => performer.points > 0)
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 3);
 
       console.log('Top performers:', topPerformers);
 
-      // Get weekly engagement data from user_activities
+      // Get weekly engagement data
       const fourWeeksAgo = new Date();
       fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
 
@@ -180,7 +173,7 @@ export const useAdminStats = () => {
           week: `Week ${4 - i}`,
           users: uniqueUsers,
           sessions: weekActivities.length,
-          completion: Math.min(weekCompletions * 10, 100) // Scale completion for visualization
+          completion: Math.min(weekCompletions * 10, 100) // Scale for visualization
         });
       }
 

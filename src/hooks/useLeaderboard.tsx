@@ -24,68 +24,53 @@ export const useLeaderboard = () => {
       try {
         console.log('Fetching leaderboard data...');
         
-        // Get all profiles
-        const { data: profilesData, error: profilesError } = await supabase
+        // Get all profiles with their progress data
+        const { data: leaderboardData, error: leaderboardError } = await supabase
           .from('profiles')
-          .select('id, full_name, email');
+          .select(`
+            id,
+            full_name,
+            email,
+            user_progress!user_progress_user_id_fkey (
+              total_points,
+              study_streak
+            ),
+            user_achievements!user_achievements_user_id_fkey (
+              id
+            ),
+            discussion_posts!discussion_posts_user_id_fkey (
+              id
+            )
+          `);
 
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
+        if (leaderboardError) {
+          console.error('Error fetching leaderboard:', leaderboardError);
           setLeaderboard([]);
           setLoading(false);
           return;
         }
 
-        console.log('Profiles found:', profilesData);
+        console.log('Raw leaderboard data:', leaderboardData);
 
-        if (!profilesData || profilesData.length === 0) {
+        if (!leaderboardData || leaderboardData.length === 0) {
           console.log('No profiles found');
           setLeaderboard([]);
           setLoading(false);
           return;
         }
 
-        // Get all user progress data
-        const { data: progressData, error: progressError } = await supabase
-          .from('user_progress')
-          .select('user_id, total_points, study_streak');
-
-        if (progressError) {
-          console.error('Error fetching progress:', progressError);
-        }
-
-        console.log('Progress data:', progressData);
-
-        // Get achievement counts
-        const { data: achievementData, error: achievementError } = await supabase
-          .from('user_achievements')
-          .select('user_id');
-
-        if (achievementError) {
-          console.error('Error fetching achievements:', achievementError);
-        }
-
-        // Get post counts
-        const { data: postData, error: postError } = await supabase
-          .from('discussion_posts')
-          .select('user_id');
-
-        if (postError) {
-          console.error('Error fetching posts:', postError);
-        }
-
-        // Create leaderboard entries for ALL profiles
-        const leaderboardData = profilesData.map(profile => {
-          // Aggregate progress data for this user (sum all points and get max streak)
-          const userProgressEntries = progressData?.filter(p => p.user_id === profile.id) || [];
-          const totalPoints = userProgressEntries.reduce((sum, p) => sum + (p.total_points || 0), 0);
-          const maxStreak = Math.max(...userProgressEntries.map(p => p.study_streak || 0), 0);
+        // Process the data to create leaderboard entries
+        const processedData = leaderboardData.map(profile => {
+          // Calculate total points from all progress entries
+          const progressEntries = profile.user_progress || [];
+          const totalPoints = progressEntries.reduce((sum: number, p: any) => sum + (p.total_points || 0), 0);
           
-          // Count achievements for this user
-          const achievementCount = achievementData?.filter(a => a.user_id === profile.id).length || 0;
+          // Get maximum study streak
+          const maxStreak = Math.max(...progressEntries.map((p: any) => p.study_streak || 0), 0);
           
-          // Count posts for this user
-          const postCount = postData?.filter(p => p.user_id === profile.id).length || 0;
+          // Count achievements and posts
+          const achievementCount = (profile.user_achievements || []).length;
+          const postCount = (profile.discussion_posts || []).length;
 
           const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
 
@@ -102,15 +87,15 @@ export const useLeaderboard = () => {
         });
 
         // Sort by total points (descending)
-        leaderboardData.sort((a, b) => b.total_points - a.total_points);
+        processedData.sort((a, b) => b.total_points - a.total_points);
 
         // Assign ranks
-        leaderboardData.forEach((entry, index) => {
+        processedData.forEach((entry, index) => {
           entry.rank = index + 1;
         });
 
-        console.log('Final leaderboard data:', leaderboardData);
-        setLeaderboard(leaderboardData);
+        console.log('Final leaderboard data:', processedData);
+        setLeaderboard(processedData);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
         setLeaderboard([]);
@@ -119,7 +104,9 @@ export const useLeaderboard = () => {
       }
     };
 
-    fetchLeaderboard();
+    if (user) {
+      fetchLeaderboard();
+    }
   }, [user]);
 
   return { leaderboard, loading };

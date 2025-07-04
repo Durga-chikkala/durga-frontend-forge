@@ -8,7 +8,7 @@ import { useDiscussionPosts } from '@/hooks/useDiscussionPosts';
 import { formatDistanceToNow } from 'date-fns';
 
 export const DiscussionForum = () => {
-  const { posts, loading } = useDiscussionPosts();
+  const { posts, loading, refetch } = useDiscussionPosts();
 
   const getCategoryColor = (category: string) => {
     const colors = {
@@ -60,10 +60,20 @@ export const DiscussionForum = () => {
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-green-600" />
             Discussion Forum
+            <Badge variant="secondary" className="ml-2">
+              {posts.length} posts
+            </Badge>
           </CardTitle>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+          <Button 
+            size="sm" 
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => {
+              // Refresh posts when user clicks new post
+              refetch();
+            }}
+          >
             <Plus className="w-4 h-4 mr-1" />
-            New Post
+            Refresh
           </Button>
         </div>
       </CardHeader>
@@ -73,11 +83,7 @@ export const DiscussionForum = () => {
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 mb-2">No discussions yet</p>
-              <p className="text-sm text-gray-400">Be the first to start a conversation!</p>
-              <Button className="mt-4 bg-green-600 hover:bg-green-700 text-white">
-                <Plus className="w-4 h-4 mr-1" />
-                Create First Post
-              </Button>
+              <p className="text-sm text-gray-400">Start a conversation with your peers!</p>
             </div>
           ) : (
             posts.map((post) => (

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -5,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserCheck, UserX, Shield } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Shield, RefreshCw } from 'lucide-react';
 
 interface UserWithRole {
   id: string;
@@ -30,12 +31,11 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
   const [newRole, setNewRole] = useState('student');
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
     try {
+      setLoading(true);
+      console.log('Fetching users for admin...');
+      
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -46,10 +46,15 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
+
+      console.log('Fetched users:', data);
       setUsers(data || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error in fetchUsers:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch users',
@@ -59,6 +64,10 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const handleRoleUpdate = async () => {
     if (!selectedUser) return;
@@ -95,7 +104,12 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading users...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2">Loading users...</p>
+      </div>
+    );
   }
 
   return (
@@ -103,6 +117,10 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">User Management</h2>
         <div className="flex gap-2">
+          <Button onClick={fetchUsers} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Refresh
+          </Button>
           <Badge variant="outline" className="px-3 py-1">
             Total: {users.length}
           </Badge>
@@ -125,33 +143,43 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.full_name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={user.user_roles?.role === 'admin' ? 'default' : 
-                               user.user_roles?.role === 'instructor' ? 'secondary' : 'outline'}
-                    >
-                      {user.user_roles?.role || 'student'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openRoleDialog(user)}
-                    >
-                      <Shield className="w-4 h-4 mr-1" />
-                      Change Role
-                    </Button>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    No users found
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.full_name || 'Unknown User'}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={user.user_roles?.role === 'admin' ? 'default' : 
+                                 user.user_roles?.role === 'instructor' ? 'secondary' : 'outline'}
+                      >
+                        {user.user_roles?.role || 'student'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openRoleDialog(user)}
+                      >
+                        <Shield className="w-4 h-4 mr-1" />
+                        Change Role
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -165,7 +193,7 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
           {selectedUser && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold">{selectedUser.full_name}</h3>
+                <h3 className="font-semibold">{selectedUser.full_name || 'Unknown User'}</h3>
                 <p className="text-gray-600">{selectedUser.email}</p>
               </div>
               <div>

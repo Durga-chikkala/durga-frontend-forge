@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useInitializeUserData } from '@/hooks/useInitializeUserData';
 import { Navigation } from '@/components/Navigation';
 import { DiscussionForum } from '@/components/dashboard/DiscussionForum';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
@@ -9,6 +10,9 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 const Community = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  
+  // Initialize user data when they access the community
+  useInitializeUserData();
 
   useEffect(() => {
     if (!loading && !user) {

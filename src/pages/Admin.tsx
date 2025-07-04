@@ -1,6 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useInitializeUserData } from '@/hooks/useInitializeUserData';
 import { Navigation } from '@/components/Navigation';
 import { QuickStats } from '@/components/admin/QuickStats';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
@@ -20,6 +22,9 @@ const Admin = () => {
     questions: 0,
     sessions: 0
   });
+  
+  // Initialize user data
+  useInitializeUserData();
 
   useEffect(() => {
     if (!loading && !user) {

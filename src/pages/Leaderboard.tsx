@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useInitializeUserData } from '@/hooks/useInitializeUserData';
 import { Navigation } from '@/components/Navigation';
 import { InteractiveLeaderboard } from '@/components/dashboard/InteractiveLeaderboard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -9,6 +10,9 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 const Leaderboard = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  
+  // Initialize user data when they access the leaderboard
+  useInitializeUserData();
 
   useEffect(() => {
     if (!loading && !user) {

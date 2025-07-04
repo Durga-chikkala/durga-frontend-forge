@@ -31,14 +31,36 @@ export const useDiscussionPosts = () => {
         .from('discussion_posts')
         .select(`
           *,
-          profiles(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) {
         console.error('Error fetching posts:', error);
-        setPosts([]);
+        // If inner join fails, try left join to get all posts
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('discussion_posts')
+          .select(`
+            *,
+            profiles(full_name, email)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          setPosts([]);
+          return;
+        }
+        
+        // Use fallback data
+        const processedFallbackPosts = (fallbackData || []).map(post => ({
+          ...post,
+          display_name: post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Anonymous User'
+        }));
+        
+        setPosts(processedFallbackPosts);
         return;
       }
 

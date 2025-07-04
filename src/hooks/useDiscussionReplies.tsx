@@ -29,31 +29,49 @@ export const useDiscussionReplies = (postId: string) => {
       console.log('Fetching replies for post:', postId);
       setLoading(true);
       
+      // Try inner join first to get only replies with profiles
       const { data, error } = await supabase
         .from('discussion_replies')
         .select(`
           *,
-          profiles(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching replies:', error);
-        setReplies([]);
-        return;
+      let finalData = data;
+      
+      if (error || !data) {
+        console.log('Inner join failed, trying left join:', error);
+        // Fallback to left join to get all replies
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('discussion_replies')
+          .select(`
+            *,
+            profiles(full_name, email)
+          `)
+          .eq('post_id', postId)
+          .order('created_at', { ascending: true });
+
+        if (fallbackError) {
+          console.error('Error fetching replies:', fallbackError);
+          setReplies([]);
+          return;
+        }
+        
+        finalData = fallbackData;
       }
 
-      console.log('Raw replies data:', data);
+      console.log('Raw replies data:', finalData);
 
-      if (!data || data.length === 0) {
+      if (!finalData || finalData.length === 0) {
         console.log('No replies found for post:', postId);
         setReplies([]);
         return;
       }
 
       // Process replies to ensure proper display names
-      const processedReplies = data.map(reply => {
+      const processedReplies = finalData.map(reply => {
         let displayName = 'Anonymous User';
         
         if (reply.profiles) {

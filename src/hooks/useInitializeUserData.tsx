@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useInitializeUserData = () => {
   const { user } = useAuth();
@@ -13,80 +13,120 @@ export const useInitializeUserData = () => {
       try {
         console.log('Initializing user data for:', user.id);
 
-        // Check if user has any progress data
-        const { data: existingProgress } = await supabase
-          .from('user_progress')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
+        // Check if profile exists
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-        // If no progress data exists, create initial entry
-        if (!existingProgress || existingProgress.length === 0) {
-          console.log('Creating initial progress data for user:', user.id);
-          
-          const { error } = await supabase
-            .from('user_progress')
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error checking profile:', profileError);
+          return;
+        }
+
+        // Create profile if it doesn't exist
+        if (!existingProfile) {
+          console.log('Creating profile for user:', user.id);
+          const { error: insertError } = await supabase
+            .from('profiles')
             .insert({
-              user_id: user.id,
-              week_number: 1,
-              total_points: Math.floor(Math.random() * 500) + 50, // Random points between 50-550
-              study_streak: Math.floor(Math.random() * 10) + 1, // Random streak 1-10
-              is_completed: false
+              id: user.id,
+              email: user.email || '',
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
             });
 
-          if (error) {
-            console.error('Error creating initial progress:', error);
+          if (insertError) {
+            console.error('Error creating profile:', insertError);
           } else {
-            console.log('Initial progress data created successfully');
+            console.log('Profile created successfully');
           }
         }
 
-        // Check if user has any activity data
-        const { data: existingActivity } = await supabase
-          .from('user_activities')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-        // If no activity data exists, create initial entry
-        if (!existingActivity || existingActivity.length === 0) {
-          console.log('Creating initial activity data for user:', user.id);
-          
-          const { error } = await supabase
-            .from('user_activities')
-            .insert({
-              user_id: user.id,
-              activity_type: 'login',
-              description: 'Welcome! You joined the platform successfully.',
-              points_earned: 20
-            });
-
-          if (error) {
-            console.error('Error creating initial activity:', error);
-          } else {
-            console.log('Initial activity data created successfully');
-          }
-        }
-
-        // Ensure user has a role assigned
-        const { data: userRole } = await supabase
+        // Check if user role exists
+        const { data: existingRole, error: roleError } = await supabase
           .from('user_roles')
-          .select('role')
+          .select('*')
           .eq('user_id', user.id)
           .single();
 
-        if (!userRole) {
-          console.log('Assigning default role to user:', user.id);
-          
-          const { error: roleError } = await supabase
+        if (roleError && roleError.code !== 'PGRST116') {
+          console.error('Error checking user role:', roleError);
+          return;
+        }
+
+        // Create default user role if it doesn't exist
+        if (!existingRole) {
+          console.log('Creating default role for user:', user.id);
+          const { error: roleInsertError } = await supabase
             .from('user_roles')
             .insert({
               user_id: user.id,
               role: 'student'
             });
 
-          if (roleError) {
-            console.error('Error assigning role:', roleError);
+          if (roleInsertError) {
+            console.error('Error creating user role:', roleInsertError);
+          } else {
+            console.log('User role created successfully');
+          }
+        }
+
+        // Initialize user progress for week 1 if it doesn't exist
+        const { data: existingProgress, error: progressError } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('week_number', 1)
+          .single();
+
+        if (progressError && progressError.code !== 'PGRST116') {
+          console.error('Error checking user progress:', progressError);
+          return;
+        }
+
+        if (!existingProgress) {
+          console.log('Creating initial progress for user:', user.id);
+          const { error: progressInsertError } = await supabase
+            .from('user_progress')
+            .insert({
+              user_id: user.id,
+              week_number: 1,
+              total_points: 0,
+              study_streak: 0,
+              is_completed: false
+            });
+
+          if (progressInsertError) {
+            console.error('Error creating user progress:', progressInsertError);
+          } else {
+            console.log('User progress created successfully');
+          }
+        }
+
+        // Create a welcome activity
+        const { data: existingActivity, error: activityCheckError } = await supabase
+          .from('user_activities')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('activity_type', 'login')
+          .limit(1);
+
+        if (!activityCheckError && (!existingActivity || existingActivity.length === 0)) {
+          console.log('Creating welcome activity for user:', user.id);
+          const { error: activityInsertError } = await supabase
+            .from('user_activities')
+            .insert({
+              user_id: user.id,
+              activity_type: 'login',
+              description: 'Welcome to the platform!',
+              points_earned: 10
+            });
+
+          if (activityInsertError) {
+            console.error('Error creating welcome activity:', activityInsertError);
+          } else {
+            console.log('Welcome activity created successfully');
           }
         }
 

@@ -25,10 +25,18 @@ export const useLeaderboard = () => {
         console.log('Fetching leaderboard data...');
         setLoading(true);
         
-        // Get all profiles
-        const { data: profiles, error: profilesError } = await supabase
+        // Get all profiles with comprehensive data in a single query
+        const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name, email');
+          .select(`
+            id,
+            full_name,
+            email,
+            user_progress(total_points, study_streak),
+            user_activities(points_earned),
+            user_achievements(id),
+            discussion_posts(id)
+          `);
 
         if (profilesError) {
           console.error('Error fetching profiles:', profilesError);
@@ -36,79 +44,66 @@ export const useLeaderboard = () => {
           return;
         }
 
-        if (!profiles || profiles.length === 0) {
+        if (!profilesData || profilesData.length === 0) {
           console.log('No profiles found');
           setLeaderboard([]);
           return;
         }
 
-        console.log('Profiles found:', profiles);
+        console.log('Comprehensive profiles data:', profilesData);
 
-        // Fetch additional data for each profile
-        const leaderboardData = await Promise.all(
-          profiles.map(async (profile) => {
-            try {
-              // Get user progress - sum all points for the user
-              const { data: progressData } = await supabase
-                .from('user_progress')
-                .select('total_points, study_streak')
-                .eq('user_id', profile.id);
+        // Process the data to create leaderboard entries
+        const leaderboardData = profilesData.map((profile: any) => {
+          // Calculate total points from user_progress
+          const progressPoints = Array.isArray(profile.user_progress) 
+            ? profile.user_progress.reduce((sum: number, p: any) => sum + (p.total_points || 0), 0)
+            : 0;
 
-              // Get user activities total points
-              const { data: activitiesData } = await supabase
-                .from('user_activities')
-                .select('points_earned')
-                .eq('user_id', profile.id);
+          // Calculate total points from user_activities
+          const activityPoints = Array.isArray(profile.user_activities)
+            ? profile.user_activities.reduce((sum: number, a: any) => sum + (a.points_earned || 0), 0)
+            : 0;
 
-              // Get achievements count
-              const { count: achievementsCount } = await supabase
-                .from('user_achievements')
-                .select('id', { count: 'exact' })
-                .eq('user_id', profile.id);
+          // Get maximum study streak
+          const maxStreak = Array.isArray(profile.user_progress) && profile.user_progress.length > 0
+            ? Math.max(...profile.user_progress.map((p: any) => p.study_streak || 0))
+            : 0;
 
-              // Get posts count
-              const { count: postsCount } = await supabase
-                .from('discussion_posts')
-                .select('id', { count: 'exact' })
-                .eq('user_id', profile.id);
+          // Count achievements
+          const achievementsCount = Array.isArray(profile.user_achievements) 
+            ? profile.user_achievements.length 
+            : 0;
 
-              // Calculate totals
-              const progressPoints = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
-              const activityPoints = activitiesData?.reduce((sum, a) => sum + (a.points_earned || 0), 0) || 0;
-              const totalPoints = progressPoints + activityPoints;
-              
-              const maxStreak = Math.max(...(progressData?.map(p => p.study_streak || 0) || [0]), 0);
+          // Count posts
+          const postsCount = Array.isArray(profile.discussion_posts) 
+            ? profile.discussion_posts.length 
+            : 0;
 
-              const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
+          const totalPoints = progressPoints + activityPoints;
+          const displayName = profile.full_name || profile.email?.split('@')[0] || 'Unknown User';
 
-              return {
-                user_id: profile.id,
-                full_name: displayName,
-                total_points: totalPoints,
-                study_streak: maxStreak,
-                achievements_count: achievementsCount || 0,
-                posts_count: postsCount || 0,
-                rank: 0, // Will be set after sorting
-                isCurrentUser: profile.id === user?.id
-              };
-            } catch (error) {
-              console.error('Error processing profile:', profile.id, error);
-              return null;
-            }
-          })
-        );
+          return {
+            user_id: profile.id,
+            full_name: displayName,
+            total_points: totalPoints,
+            study_streak: maxStreak,
+            achievements_count: achievementsCount,
+            posts_count: postsCount,
+            rank: 0, // Will be set after sorting
+            isCurrentUser: profile.id === user?.id
+          };
+        });
 
-        // Filter out null entries and sort by total points (descending)
-        const validLeaderboardData = leaderboardData.filter(Boolean) as LeaderboardEntry[];
-        validLeaderboardData.sort((a, b) => b.total_points - a.total_points);
+        // Sort by total points (descending)
+        leaderboardData.sort((a, b) => b.total_points - a.total_points);
 
         // Assign ranks
-        validLeaderboardData.forEach((entry, index) => {
+        leaderboardData.forEach((entry, index) => {
           entry.rank = index + 1;
         });
 
-        console.log('Final leaderboard data:', validLeaderboardData);
-        setLeaderboard(validLeaderboardData);
+        console.log('Final leaderboard data:', leaderboardData);
+        setLeaderboard(leaderboardData);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
         setLeaderboard([]);

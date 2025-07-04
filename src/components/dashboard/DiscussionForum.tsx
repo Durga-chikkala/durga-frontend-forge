@@ -80,7 +80,7 @@ export const DiscussionForum = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {posts.length === 0 ? (
+          {!posts || posts.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 mb-2">No discussions yet</p>
@@ -95,30 +95,35 @@ export const DiscussionForum = () => {
                 <div className="flex items-start gap-3">
                   <Avatar className="w-10 h-10 border-2 border-green-100">
                     <AvatarFallback className="bg-green-100 text-green-700 text-sm font-semibold">
-                      {getInitials(post.display_name)}
+                      {getInitials(post.display_name || 'Anonymous User')}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-gray-900 truncate">{post.title}</h4>
+                      <h4 className="font-semibold text-gray-900 truncate">{post.title || 'Untitled'}</h4>
                       <Badge className={`text-xs px-2 py-1 ${getCategoryColor(post.category || 'general')}`}>
                         {post.category || 'general'}
                       </Badge>
                     </div>
                     
                     <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                      {post.content}
+                      {post.content || 'No content available'}
                     </p>
                     
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-green-600">
-                          {post.display_name}
+                          {post.display_name || 'Anonymous User'}
                         </span>
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                          <span>
+                            {post.created_at 
+                              ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
+                              : 'Unknown time'
+                            }
+                          </span>
                         </div>
                       </div>
                       
@@ -140,7 +145,7 @@ export const DiscussionForum = () => {
           )}
         </div>
         
-        {posts.length > 0 && (
+        {posts && posts.length > 0 && (
           <div className="mt-6 text-center">
             <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
               <TrendingUp className="w-4 h-4 mr-2" />

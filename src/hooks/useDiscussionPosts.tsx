@@ -34,7 +34,7 @@ export const useDiscussionPosts = () => {
           profiles!discussion_posts_user_id_fkey(full_name, email)
         `)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) {
         console.error('Error fetching posts:', error);

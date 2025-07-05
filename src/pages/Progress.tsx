@@ -66,55 +66,104 @@ const ProgressPage = () => {
     if (!user) return;
     
     try {
+      console.log('Fetching accurate progress stats for user:', user.id);
+
       // Get total weeks from course content
-      const { data: contentData } = await supabase
+      const { data: contentData, error: contentError } = await supabase
         .from('course_content')
         .select('week_number')
         .eq('is_published', true)
         .order('week_number', { ascending: false })
         .limit(1);
 
+      if (contentError) {
+        console.error('Error fetching content data:', contentError);
+      }
+
       const totalWeeks = contentData?.[0]?.week_number || 12;
 
-      // Get user's completed sessions
-      const { data: sessionsData } = await supabase
+      // Get user's completed sessions (properly count unique completed sessions)
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('user_study_sessions')
-        .select('content_id, created_at')
+        .select('id, completed, created_at')
         .eq('user_id', user.id)
         .eq('completed', true);
 
-      // Get user's total points
-      const { data: pointsData } = await supabase
+      if (sessionsError) {
+        console.error('Error fetching sessions data:', sessionsError);
+      }
+
+      // Get user's progress records
+      const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
-        .select('total_points')
+        .select('week_number, is_completed, total_points')
         .eq('user_id', user.id);
 
-      const totalPoints = pointsData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
+      if (progressError) {
+        console.error('Error fetching progress data:', progressError);
+      }
 
-      // Get current week (based on course start date or current date)
-      const currentWeek = Math.min(Math.ceil(Date.now() / (7 * 24 * 60 * 60 * 1000)) % totalWeeks || 1, totalWeeks);
+      // Calculate completed weeks from progress table
+      const completedWeeksFromProgress = progressData?.filter(p => p.is_completed).length || 0;
+      
+      // Calculate total points from progress table
+      const totalPointsFromProgress = progressData?.reduce((sum, p) => sum + (p.total_points || 0), 0) || 0;
 
-      // Calculate completed weeks
-      const completedWeeks = sessionsData?.length ? Math.min(Math.floor(sessionsData.length / 2), totalWeeks) : 0;
+      // Get activity points
+      const { data: activityData, error: activityError } = await supabase
+        .from('user_activities')
+        .select('points_earned')
+        .eq('user_id', user.id);
 
-      // Get user ranking
-      const { data: rankingData } = await supabase
-        .from('user_progress')
-        .select('user_id, total_points')
-        .order('total_points', { ascending: false });
+      if (activityError) {
+        console.error('Error fetching activity data:', activityError);
+      }
 
-      const userRank = rankingData?.findIndex(r => r.user_id === user.id) + 1 || 0;
-      const totalUsers = rankingData?.length || 0;
+      const totalPointsFromActivities = activityData?.reduce((sum, a) => sum + (a.points_earned || 0), 0) || 0;
+      const totalPoints = totalPointsFromProgress + totalPointsFromActivities;
 
-      setProgressStats({
+      // Calculate current week (next incomplete week)
+      const completedWeeks = Math.max(completedWeeksFromProgress, Math.floor((sessionsData?.length || 0) / 2));
+      const currentWeek = Math.min(completedWeeks + 1, totalWeeks);
+
+      // Get accurate user ranking based on total points
+      const { data: allUsersProgress, error: rankingError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          user_progress!inner(total_points),
+          user_activities(points_earned)
+        `);
+
+      if (rankingError) {
+        console.error('Error fetching ranking data:', rankingError);
+      }
+
+      // Calculate rankings properly
+      const userRankings = (allUsersProgress || []).map(profile => {
+        const progressPoints = profile.user_progress?.reduce((sum: number, p: any) => sum + (p.total_points || 0), 0) || 0;
+        const activityPoints = profile.user_activities?.reduce((sum: number, a: any) => sum + (a.points_earned || 0), 0) || 0;
+        return {
+          user_id: profile.id,
+          total_points: progressPoints + activityPoints
+        };
+      }).sort((a, b) => b.total_points - a.total_points);
+
+      const userRank = userRankings.findIndex(r => r.user_id === user.id) + 1;
+      const totalUsers = userRankings.length;
+
+      const calculatedStats = {
         totalWeeks,
         completedWeeks,
         currentWeek,
-        weeklyProgress: (currentWeek / totalWeeks) * 100,
+        weeklyProgress: totalWeeks > 0 ? (completedWeeks / totalWeeks) * 100 : 0,
         totalPoints,
-        rank: userRank,
+        rank: userRank || 0,
         totalUsers
-      });
+      };
+
+      console.log('Calculated accurate progress stats:', calculatedStats);
+      setProgressStats(calculatedStats);
     } catch (error) {
       console.error('Error fetching progress stats:', error);
     } finally {

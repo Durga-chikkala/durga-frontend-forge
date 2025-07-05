@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, RefreshCw } from 'lucide-react';
+import { Shield, RefreshCw, Users, Crown } from 'lucide-react';
 
 interface UserWithRole {
   id: string;
@@ -17,6 +17,8 @@ interface UserWithRole {
   user_roles?: {
     role: string;
   } | null;
+  total_points?: number;
+  posts_count?: number;
 }
 
 interface UsersAdminProps {
@@ -34,25 +36,75 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users for admin...');
+      console.log('Fetching comprehensive users data for admin...');
       
-      const { data, error } = await supabase
+      // Get all profiles first
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (
-            role
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching users:', error);
-        throw error;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
       }
 
-      console.log('Fetched users:', data);
-      setUsers(data || []);
+      // Get additional data for each user
+      const usersWithData = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          try {
+            // Get user role
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', profile.id)
+              .single();
+
+            // Get user points from progress
+            const { data: progressData } = await supabase
+              .from('user_progress')
+              .select('total_points')
+              .eq('user_id', profile.id)
+              .order('updated_at', { ascending: false })
+              .limit(1);
+
+            // Get user points from activities
+            const { data: activityData } = await supabase
+              .from('user_activities')
+              .select('points_earned')
+              .eq('user_id', profile.id);
+
+            // Get posts count
+            const { data: postsData } = await supabase
+              .from('discussion_posts')
+              .select('id')
+              .eq('user_id', profile.id);
+
+            const progressPoints = progressData?.[0]?.total_points || 0;
+            const activityPoints = activityData?.reduce((sum, activity) => sum + (activity.points_earned || 0), 0) || 0;
+            const totalPoints = progressPoints + activityPoints;
+            const postsCount = postsData?.length || 0;
+
+            return {
+              ...profile,
+              user_roles: roleData,
+              total_points: totalPoints,
+              posts_count: postsCount
+            };
+          } catch (error) {
+            console.error(`Error fetching data for user ${profile.id}:`, error);
+            return {
+              ...profile,
+              user_roles: null,
+              total_points: 0,
+              posts_count: 0
+            };
+          }
+        })
+      );
+
+      console.log('Fetched users with comprehensive data:', usersWithData);
+      setUsers(usersWithData);
     } catch (error) {
       console.error('Error in fetchUsers:', error);
       toast({
@@ -112,22 +164,51 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
     );
   }
 
+  const adminCount = users.filter(u => u.user_roles?.role === 'admin').length;
+  const instructorCount = users.filter(u => u.user_roles?.role === 'instructor').length;
+  const studentCount = users.filter(u => !u.user_roles?.role || u.user_roles.role === 'student').length;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">User Management</h2>
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Users className="w-6 h-6" />
+          User Management
+        </h2>
         <div className="flex gap-2">
           <Button onClick={fetchUsers} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-1" />
             Refresh
           </Button>
-          <Badge variant="outline" className="px-3 py-1">
-            Total: {users.length}
-          </Badge>
-          <Badge variant="outline" className="px-3 py-1">
-            Admins: {users.filter(u => u.user_roles?.role === 'admin').length}
-          </Badge>
         </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{users.length}</div>
+            <div className="text-sm text-gray-600">Total Users</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{studentCount}</div>
+            <div className="text-sm text-gray-600">Students</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-purple-600">{instructorCount}</div>
+            <div className="text-sm text-gray-600">Instructors</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-red-600">{adminCount}</div>
+            <div className="text-sm text-gray-600">Admins</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -138,6 +219,8 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Points</TableHead>
+                <TableHead>Posts</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -145,7 +228,7 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
             <TableBody>
               {users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -153,7 +236,10 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
                 users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      {user.full_name || 'Unknown User'}
+                      <div className="flex items-center gap-2">
+                        {user.user_roles?.role === 'admin' && <Crown className="w-4 h-4 text-yellow-500" />}
+                        {user.full_name || 'Unknown User'}
+                      </div>
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
@@ -164,6 +250,8 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
                         {user.user_roles?.role || 'student'}
                       </Badge>
                     </TableCell>
+                    <TableCell>{user.total_points || 0}</TableCell>
+                    <TableCell>{user.posts_count || 0}</TableCell>
                     <TableCell>
                       {new Date(user.created_at).toLocaleDateString()}
                     </TableCell>
@@ -195,6 +283,7 @@ export const UsersAdmin = ({ onStatsUpdate }: UsersAdminProps) => {
               <div>
                 <h3 className="font-semibold">{selectedUser.full_name || 'Unknown User'}</h3>
                 <p className="text-gray-600">{selectedUser.email}</p>
+                <p className="text-sm text-gray-500">Points: {selectedUser.total_points || 0}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Role</label>

@@ -24,73 +24,61 @@ export const useDiscussionPosts = () => {
 
   const fetchPosts = useCallback(async () => {
     try {
-      console.log('Fetching discussion posts...');
+      console.log('Fetching all discussion posts with user profiles...');
       setLoading(true);
       
+      // Fetch posts with proper join to profiles
       const { data, error } = await supabase
         .from('discussion_posts')
         .select(`
           *,
           profiles!inner(full_name, email)
         `)
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching posts:', error);
-        // If inner join fails, try left join to get all posts
+        console.error('Error fetching posts with inner join:', error);
+        
+        // Fallback: try without inner join
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('discussion_posts')
-          .select(`
-            *,
-            profiles(full_name, email)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(20);
+          .select('*')
+          .order('created_at', { ascending: false });
 
         if (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
+          console.error('Fallback query failed:', fallbackError);
           setPosts([]);
           return;
         }
-        
-        // Use fallback data
-        const processedFallbackPosts = (fallbackData || []).map(post => ({
-          ...post,
-          display_name: post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Anonymous User'
-        }));
-        
-        setPosts(processedFallbackPosts);
+
+        // Get profile data separately for fallback posts
+        const postsWithProfiles = await Promise.all(
+          (fallbackData || []).map(async (post) => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', post.user_id)
+              .single();
+
+            return {
+              ...post,
+              profiles: profileData,
+              display_name: profileData?.full_name || profileData?.email?.split('@')[0] || 'Anonymous User'
+            };
+          })
+        );
+
+        setPosts(postsWithProfiles);
         return;
       }
 
-      console.log('Raw posts data:', data);
+      // Process successful data
+      const processedPosts = (data || []).map(post => ({
+        ...post,
+        display_name: post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Anonymous User'
+      }));
 
-      if (!data || data.length === 0) {
-        console.log('No posts found');
-        setPosts([]);
-        return;
-      }
-
-      // Process posts to ensure proper display names
-      const processedPosts = data.map(post => {
-        let displayName = 'Anonymous User';
-        
-        if (post.profiles) {
-          if (post.profiles.full_name) {
-            displayName = post.profiles.full_name;
-          } else if (post.profiles.email) {
-            displayName = post.profiles.email.split('@')[0];
-          }
-        }
-
-        return {
-          ...post,
-          display_name: displayName
-        };
-      });
-
-      console.log('Processed posts:', processedPosts);
+      console.log('Successfully fetched posts:', processedPosts.length);
       setPosts(processedPosts);
     } catch (error) {
       console.error('Error in fetchPosts:', error);
@@ -108,23 +96,21 @@ export const useDiscussionPosts = () => {
         return false;
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('discussion_posts')
         .insert({
           title,
           content,
           category,
           user_id: user.id
-        })
-        .select()
-        .single();
+        });
 
       if (error) {
         console.error('Error creating post:', error);
         return false;
       }
 
-      console.log('Post created successfully:', data);
+      console.log('Post created successfully');
       fetchPosts(); // Refresh posts
       return true;
     } catch (error) {
@@ -135,25 +121,14 @@ export const useDiscussionPosts = () => {
 
   const likePost = useCallback(async (postId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('User not authenticated');
-        return false;
-      }
-
-      // Get current likes count
       const { data: currentPost } = await supabase
         .from('discussion_posts')
         .select('likes_count')
         .eq('id', postId)
         .single();
 
-      if (!currentPost) {
-        console.error('Post not found');
-        return false;
-      }
+      if (!currentPost) return false;
 
-      // Update likes count
       const { error } = await supabase
         .from('discussion_posts')
         .update({ 
@@ -166,8 +141,7 @@ export const useDiscussionPosts = () => {
         return false;
       }
 
-      console.log('Post liked successfully');
-      fetchPosts(); // Refresh posts to show updated like count
+      fetchPosts(); // Refresh posts
       return true;
     } catch (error) {
       console.error('Error in likePost:', error);

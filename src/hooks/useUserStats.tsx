@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,9 +32,9 @@ export const useUserStats = () => {
 
     const fetchStats = async () => {
       try {
-        console.log('Fetching accurate user stats for user:', user.id);
+        console.log('Fetching user stats for user:', user.id);
 
-        // Get completed sessions count
+        // Get completed sessions count (properly count unique completed sessions)
         const { data: completedSessions, error: sessionsError } = await supabase
           .from('user_study_sessions')
           .select('id')
@@ -44,7 +45,7 @@ export const useUserStats = () => {
           console.error('Error fetching completed sessions:', sessionsError);
         }
 
-        // Get total available published content
+        // Get total available published content (this represents total possible sessions)
         const { data: totalContent, error: contentError } = await supabase
           .from('course_content')
           .select('id')
@@ -54,8 +55,8 @@ export const useUserStats = () => {
           console.error('Error fetching total content:', contentError);
         }
 
-        // Get latest user progress for streak
-        const { data: latestProgress, error: progressError } = await supabase
+        // Get user progress for streak and points
+        const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
           .select('study_streak, total_points')
           .eq('user_id', user.id)
@@ -66,7 +67,7 @@ export const useUserStats = () => {
           console.error('Error fetching progress:', progressError);
         }
 
-        // Get total points from activities
+        // Get activity points
         const { data: activities, error: activitiesError } = await supabase
           .from('user_activities')
           .select('points_earned')
@@ -76,7 +77,7 @@ export const useUserStats = () => {
           console.error('Error fetching activities:', activitiesError);
         }
 
-        // Get earned achievements count
+        // Get achievements count
         const { data: achievements, error: achievementsError } = await supabase
           .from('user_achievements')
           .select('id')
@@ -96,11 +97,11 @@ export const useUserStats = () => {
           console.error('Error fetching posts:', postsError);
         }
 
-        // Calculate accurate totals
+        // Calculate accurate stats
         const sessionsCompletedCount = completedSessions?.length || 0;
         const totalSessionsCount = totalContent?.length || 0;
-        const currentStreak = latestProgress?.[0]?.study_streak || 0;
-        const progressPoints = latestProgress?.[0]?.total_points || 0;
+        const currentStreak = progressData?.[0]?.study_streak || 0;
+        const progressPoints = progressData?.[0]?.total_points || 0;
         const activityPoints = activities?.reduce((sum, activity) => sum + (activity.points_earned || 0), 0) || 0;
         const totalPoints = progressPoints + activityPoints;
         const achievementsCount = achievements?.length || 0;
@@ -115,11 +116,10 @@ export const useUserStats = () => {
           totalPoints: totalPoints
         };
 
-        console.log('Calculated accurate stats:', calculatedStats);
+        console.log('Calculated user stats:', calculatedStats);
         setStats(calculatedStats);
       } catch (error) {
         console.error('Error calculating user stats:', error);
-        // Keep previous stats on error to avoid showing zeros
       } finally {
         setLoading(false);
       }

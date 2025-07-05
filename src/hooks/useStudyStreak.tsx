@@ -27,17 +27,15 @@ export const useStudyStreak = () => {
     if (!user) return;
 
     try {
-      // Get user's profile creation date to calculate actual days since joining
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('created_at')
-        .eq('id', user.id)
-        .single();
+      // Get user's latest progress for accurate streak
+      const { data: progressData } = await supabase
+        .from('user_progress')
+        .select('study_streak')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      const joinDate = profileData?.created_at ? new Date(profileData.created_at) : new Date();
-      const daysSinceJoining = Math.floor((Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      // Get study sessions for streak calculation
+      // Get study sessions for week data
       const { data: sessionsData } = await supabase
         .from('user_study_sessions')
         .select('created_at, completed')
@@ -45,41 +43,14 @@ export const useStudyStreak = () => {
         .eq('completed', true)
         .order('created_at', { ascending: false });
 
-      // Calculate current streak
-      let currentStreak = 0;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (sessionsData && sessionsData.length > 0) {
-        // Group sessions by date
-        const sessionsByDate = new Map<string, boolean>();
-        sessionsData.forEach(session => {
-          const sessionDate = new Date(session.created_at);
-          sessionDate.setHours(0, 0, 0, 0);
-          const dateKey = sessionDate.toDateString();
-          sessionsByDate.set(dateKey, true);
-        });
-
-        // Calculate current streak from today backwards
-        for (let i = 0; i <= daysSinceJoining; i++) {
-          const checkDate = new Date(today);
-          checkDate.setDate(today.getDate() - i);
-          const dateKey = checkDate.toDateString();
-          
-          if (sessionsByDate.has(dateKey)) {
-            currentStreak++;
-          } else {
-            break;
-          }
-        }
-
-        // Don't let streak exceed days since joining
-        currentStreak = Math.min(currentStreak, daysSinceJoining);
-      }
+      // Use the streak from user_progress table for accuracy
+      const currentStreak = progressData?.[0]?.study_streak || 0;
 
       // Build week data for the last 7 days
       const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const weekData = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
@@ -102,8 +73,8 @@ export const useStudyStreak = () => {
       const studiedDays = weekData.filter(day => day.studied).length;
       const weeklyGoalProgress = Math.round((studiedDays / 7) * 100);
 
-      // Longest streak calculation (for simplicity, we'll use current streak + some buffer)
-      const longestStreak = Math.max(currentStreak, currentStreak + 1);
+      // Use current streak as longest for simplicity (can be enhanced later)
+      const longestStreak = Math.max(currentStreak, 1);
 
       setStreakData({
         currentStreak,
